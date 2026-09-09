@@ -82,22 +82,169 @@ body {
     color: #ffffff;
 }
 
-.search-button {
+/* =================================
+   SEARCH
+================================= */
+/* A translucent pill rather than a solid
+   chip, so the navbar's own colour carries
+   through it instead of a second flat grey
+   sitting on top */
+
+.search {
+    display: flex;
+    align-items: center;
+
+    gap: 8px;
+
+    height: 38px;
+
+    padding: 0 6px 0 12px;
+
+    border-radius: 999px;
+
+    background: rgba(248, 248, 246, 0.08);
+
+    border: 1px solid rgba(248, 248, 246, 0.14);
+
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+
+    transition:
+        background 0.2s ease,
+        border-color 0.2s ease;
+}
+
+.search:hover {
+    background: rgba(248, 248, 246, 0.12);
+
+    border-color: rgba(248, 248, 246, 0.22);
+}
+
+.search:focus-within {
+    background: rgba(248, 248, 246, 0.16);
+
+    border-color: rgba(248, 248, 246, 0.34);
+}
+
+
+/* THE MAGNIFYING GLASS */
+
+.search-submit {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    flex-shrink: 0;
+
     border: none;
     background: transparent;
 
-    font-size: 14px;
-    font-weight: 500;
+    padding: 0;
+
+    color: #bdbdb6;
 
     cursor: pointer;
-
-    color: #f8f8f6;
 
     transition: color 0.2s ease;
 }
 
-.search-button:hover {
+.search-submit:hover,
+.search:focus-within .search-submit {
     color: #ffffff;
+}
+
+.search-icon {
+    width: 16px;
+    height: 16px;
+
+    display: block;
+
+    fill: none;
+
+    stroke: currentColor;
+    stroke-width: 1.7;
+    stroke-linecap: round;
+}
+
+
+/* THE FIELD */
+
+.search-input {
+    /* Narrow at rest so it reads as a button,
+       and opens up once it is being used */
+    width: 120px;
+
+    border: none;
+    background: transparent;
+    outline: none;
+
+    font-family: inherit;
+    font-size: 14px;
+
+    color: #f8f8f6;
+
+    transition: width 0.25s ease;
+}
+
+.search-input::placeholder {
+    color: #8f8f88;
+}
+
+.search-input:focus {
+    width: 190px;
+}
+
+/* The browser's own clear button is drawn
+   dark, which is invisible in here */
+.search-input::-webkit-search-cancel-button {
+    -webkit-appearance: none;
+    appearance: none;
+}
+
+
+/* CLEAR */
+
+.search-clear {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    flex-shrink: 0;
+
+    width: 22px;
+    height: 22px;
+
+    border: none;
+    border-radius: 50%;
+
+    background: rgba(248, 248, 246, 0.12);
+
+    padding: 0;
+
+    font-family: inherit;
+    font-size: 15px;
+    line-height: 1;
+
+    color: #d6d6d0;
+
+    cursor: pointer;
+
+    transition:
+        background 0.2s ease,
+        color 0.2s ease;
+}
+
+.search-clear:hover {
+    background: rgba(248, 248, 246, 0.22);
+
+    color: #ffffff;
+}
+
+/* An author "display" beats the browser's own
+   rule for [hidden], so the attribute has to be
+   honoured explicitly or the button never hides */
+.search-clear[hidden] {
+    display: none;
 }
 
 
@@ -273,6 +420,103 @@ main {
     text-transform: uppercase;
 
     color: #777777;
+}
+
+
+/* =================================
+   PAGER
+================================= */
+/* The feed shows a page at a time so the
+   footer stays reachable. These are the way
+   to the rest of it, and they are real links,
+   so history and open-in-new-tab both work. */
+
+.pager {
+    max-width: 1100px;
+
+    margin: 0 auto;
+
+    padding: 0 40px 100px;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    gap: 20px;
+}
+
+/* An author "display" beats the browser's own
+   rule for [hidden] */
+.pager[hidden] {
+    display: none;
+}
+
+/* The last article keeps its rule above the
+   pager, but the gap below it belongs to the
+   pager now */
+.news-feed--paged {
+    padding-bottom: 40px;
+}
+
+.pager-link {
+    /* Echoes the search pill, so the two things
+       you can click on a page match */
+    border: 1px solid #dededb;
+    border-radius: 999px;
+
+    padding: 11px 20px;
+
+    font-size: 14px;
+    font-weight: 500;
+
+    color: #111111;
+
+    text-decoration: none;
+
+    white-space: nowrap;
+
+    transition:
+        background 0.2s ease,
+        border-color 0.2s ease,
+        color 0.2s ease;
+}
+
+.pager-link:hover {
+    background: #111111;
+
+    border-color: #111111;
+
+    color: #ffffff;
+}
+
+/* Holds the space on whichever side has no
+   link, so the count stays in the middle */
+.pager-gap {
+    flex: 1;
+}
+
+.pager-count {
+    font-size: 12px;
+
+    color: #888888;
+
+    white-space: nowrap;
+}
+
+
+/* =================================
+   SEARCH HEADLINE
+================================= */
+/* The hero size is set for two short fixed
+   lines. A typed query is neither, so it
+   gets a size that can hold a sentence. */
+
+.intro h1.headline--query {
+    font-size: clamp(34px, 4.5vw, 56px);
+
+    line-height: 1.05;
+
+    overflow-wrap: anywhere;
 }
 
 
@@ -788,6 +1032,14 @@ main {
         display: none;
     }
 
+    .search-input {
+        width: 92px;
+    }
+
+    .search-input:focus {
+        width: 140px;
+    }
+
     .intro {
         padding: 80px 24px 60px;
     }
@@ -798,6 +1050,28 @@ main {
 
     .news-feed {
         padding: 0 24px 80px;
+    }
+
+    .news-feed--paged {
+        padding-bottom: 32px;
+    }
+
+    .pager {
+        padding: 0 24px 80px;
+
+        gap: 12px;
+    }
+
+    .pager-link {
+        padding: 10px 16px;
+
+        font-size: 13px;
+    }
+
+    /* Two links and a count will not fit across
+       a phone, and the links are the point */
+    .pager-count {
+        display: none;
     }
 
     .news-item {

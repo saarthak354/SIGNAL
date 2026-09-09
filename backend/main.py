@@ -18,28 +18,45 @@ CORS(app)
 #   /api/articles?tab=discovery    non company sources
 #   /api/articles?tab=companies    company sources only
 #   /api/articles?company=openai   one company
+#   /api/articles?q=gpt-5          search everything
 #   /api/articles?limit=15         cap the feed
+#   /api/articles?offset=15        skip the first page
 
 MAX_LIMIT = 200
 
 
-def requested_limit():
+def positive_argument(name, default=None):
 
-    raw = request.args.get("limit")
+    raw = request.args.get(name)
 
     if not raw:
-        return None
+        return default
 
     try:
-        limit = int(raw)
+        value = int(raw)
 
     except ValueError:
-        return None
+        return default
 
-    if limit < 1:
+    if value < 0:
+        return default
+
+    return value
+
+
+def requested_limit():
+
+    limit = positive_argument("limit")
+
+    if not limit:
         return None
 
     return min(limit, MAX_LIMIT)
+
+
+def requested_offset():
+
+    return positive_argument("offset", 0)
 
 
 @app.route("/api/articles")
@@ -50,22 +67,32 @@ def articles():
     selected = select(
         cache["articles"],
         tab=request.args.get("tab"),
-        company_id=request.args.get("company")
+        company_id=request.args.get("company"),
+        query=request.args.get("q")
     )
+
+    offset = requested_offset()
 
     shown = paginate(
         selected,
-        requested_limit()
+        requested_limit(),
+        offset
     )
 
     return jsonify({
         "total_ingested": cache["ingested"],
 
         # How many matched before the cap, so the
-        # page can say what it is not showing
+        # page can say what it is not showing, and
+        # work out whether there is a page after
+        # this one
         "total_available": len(selected),
 
         "total_filtered": len(shown),
+
+        # Where this page starts, so the range it
+        # is showing can be named
+        "offset": offset,
 
         "errors": cache["errors"],
 

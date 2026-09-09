@@ -3,6 +3,8 @@ import re
 from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
 
+from dedupe import Deduper
+
 
 # -----------------------------------
 # HOW FAR BACK WE LOOK
@@ -335,30 +337,6 @@ def is_relevant(article):
 
 
 # -----------------------------------
-# DEDUPE HELPERS
-# -----------------------------------
-
-def normalize_url(url):
-
-    if not url:
-        return ""
-
-    url = url.split("?")[0]
-    url = url.split("#")[0]
-
-    return url.rstrip("/").lower()
-
-
-def normalize_title(title):
-
-    return re.sub(
-        r"[^a-z0-9]+",
-        " ",
-        (title or "").lower()
-    ).strip()
-
-
-# -----------------------------------
 # RESOLVE AN ARTICLE DATE
 # -----------------------------------
 
@@ -379,31 +357,14 @@ def filter_articles(articles, window_days=RETENTION_DAYS):
 
     filtered_articles = []
 
-    seen_urls = set()
-    seen_titles = set()
+    deduper = Deduper()
 
     for article in articles:
 
-        url = normalize_url(
-            article.get("url")
-        )
-
-        if not url:
+        if not (article.get("url") or "").strip():
             continue
 
-        if url in seen_urls:
-            continue
-
-        title = normalize_title(
-            article.get("title")
-        )
-
-        if not title:
-            continue
-
-        # The same story can arrive from more
-        # than one source under a different link
-        if title in seen_titles:
+        if not (article.get("title") or "").strip():
             continue
 
         published = article_date(article)
@@ -417,14 +378,24 @@ def filter_articles(articles, window_days=RETENTION_DAYS):
         if not is_relevant(article):
             continue
 
-        seen_urls.add(url)
-        seen_titles.add(title)
+        # Last, so that an article only ever
+        # displaces a later copy of itself once
+        # it has earned its own place in the feed
+        if not deduper.add(article, published):
+            continue
 
         # Hand the frontend one consistent
         # date format regardless of source
         article["published"] = published.isoformat()
 
         filtered_articles.append(article)
+
+    if deduper.duplicates:
+
+        print(
+            f"Dropped {deduper.duplicates} duplicate "
+            f"articles across sources"
+        )
 
     # Newest first
     filtered_articles.sort(

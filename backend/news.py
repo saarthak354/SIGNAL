@@ -76,6 +76,7 @@ def get_original_source(url, fallback_source):
         "techcrunch.com": "TechCrunch",
         "theverge.com": "The Verge",
         "arstechnica.com": "Ars Technica",
+        "technologyreview.com": "MIT Technology Review",
         "wired.com": "WIRED",
         "forbes.com": "Forbes",
         "nytimes.com": "The New York Times",
@@ -168,16 +169,18 @@ def fetch_rss_sources(sources):
                         article.get("description", "")
                     ),
 
-                    # A company feed always speaks for
-                    # itself. An aggregator like Hacker
-                    # News should credit whoever it
+                    # A publisher's feed speaks for itself,
+                    # whether that is a company blog or a
+                    # newsroom like The Verge. An aggregator
+                    # like Hacker News carries other people's
+                    # writing, so it credits whoever it
                     # actually links out to.
                     "source": (
                         get_original_source(
                             article_url,
                             source["name"]
                         )
-                        if source.get("category") == "discovery"
+                        if source.get("aggregator")
                         else source["name"]
                     ),
 

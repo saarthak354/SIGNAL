@@ -6,6 +6,11 @@
 #
 #   id        stable key used by the frontend
 #   name      label shown on the article card
+#   domains   every site the company publishes on.
+#             Decides who an article is about, and
+#             whether a link that reached us from
+#             somewhere else is really the company
+#             speaking for itself.
 #   method    "rss" or "scrape"
 #   category  "company" or "discovery"
 #   trusted   True  = everything it posts is AI news
@@ -50,7 +55,7 @@ COMPANY_SOURCES = [
 
     {
         "id": "google-deepmind",
-        "domains": ["deepmind.google", "deepmind.com", "ai.google"],
+        "domains": ["deepmind.google", "deepmind.com", "ai.google", "blog.google"],
         "aliases": ["deepmind", "gemini", "alphafold", "alphagenome", "alphago", "weathernext", "imagen", "google ai", "google's ai"],
         "name": "Google DeepMind",
         "method": "rss",
@@ -60,7 +65,7 @@ COMPANY_SOURCES = [
 
     {
         "id": "meta-ai",
-        "domains": ["ai.meta.com", "engineering.fb.com"],
+        "domains": ["ai.meta.com", "engineering.fb.com", "meta.com"],
         "aliases": ["meta ai", "meta's ai", "llama", "meta platforms", "facebook ai", "pytorch"],
         "name": "Meta AI",
         "method": "scrape",
@@ -145,7 +150,7 @@ COMPANY_SOURCES = [
 
     {
         "id": "xai",
-        "domains": ["x.ai"],
+        "domains": ["x.ai", "grok.com"],
         "aliases": ["xai", "x.ai", "grok"],
         "name": "xAI",
         "method": "scrape",
@@ -166,15 +171,91 @@ COMPANY_SOURCES = [
 # DISCOVERY
 # -----------------------------------
 #
-# Everyone who is not the company itself.
+# Everyone who is not the company itself,
+# ordered by preference. When the same story
+# reaches us twice the first source to carry
+# it keeps it, so the sites that write their
+# own reporting come before the aggregator
+# that only links to it.
+#
+#   aggregator  True = this feed links out to
+#               other people's articles, so the
+#               card should credit the site it
+#               points at rather than the feed.
 
 DISCOVERY_SOURCES = [
+
+    {
+        "id": "techcrunch",
+        "name": "TechCrunch",
+        "method": "rss",
+
+        # A dedicated AI category feed, so
+        # everything in it is already on topic.
+        "trusted": True,
+        "url": "https://techcrunch.com/category/artificial-intelligence/feed/",
+    },
+
+    {
+        "id": "the-verge",
+        "name": "The Verge",
+        "method": "rss",
+        "trusted": True,
+        "url": "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml",
+    },
+
+    {
+        "id": "ars-technica",
+        "name": "Ars Technica",
+        "method": "rss",
+        "trusted": True,
+
+        # The section feed, not the site feed:
+        # arstechnica.com/feed carries gaming,
+        # space and car reviews as well.
+        "url": "https://arstechnica.com/ai/feed/",
+    },
+
+    {
+        "id": "mit-technology-review",
+        "name": "MIT Technology Review",
+        "method": "rss",
+        "trusted": True,
+        "url": "https://www.technologyreview.com/topic/artificial-intelligence/feed/",
+    },
+
+    {
+        "id": "wired",
+        "name": "WIRED",
+        "method": "rss",
+        "trusted": True,
+        "url": "https://www.wired.com/feed/tag/ai/latest/rss",
+    },
+
+    {
+        "id": "hugging-face",
+        "name": "Hugging Face",
+        "method": "rss",
+        "trusted": True,
+
+        # One feed for both the official blog and
+        # the community posts underneath it, which
+        # is where most model releases get written up.
+        "url": "https://huggingface.co/blog/feed.xml",
+    },
 
     {
         "id": "hacker-news",
         "name": "Hacker News",
         "method": "rss",
         "trusted": False,
+
+        # Last, and the only aggregator here: an
+        # HN entry is a link to somebody else's
+        # article, so if that article also reached
+        # us from its own publisher above, the
+        # publisher's copy is the one we keep.
+        "aggregator": True,
         "url": "https://news.ycombinator.com/rss",
     },
 ]

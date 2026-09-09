@@ -4,24 +4,47 @@ const API = "http://127.0.0.1:5050";
 // every page short enough to reach the footer.
 const ARTICLES_PER_PAGE = 15;
 
+// Search is a deliberate act, so it is allowed
+// a longer page than a feed you only scroll.
+const SEARCH_RESULTS_PER_PAGE = 30;
+
 const newsFeed = document.getElementById("news-feed");
 const companyList = document.getElementById("company-list");
 const currentDate = document.getElementById("current-date");
 const eyebrow = document.getElementById("eyebrow");
 const headline = document.getElementById("headline");
 
+const pager = document.getElementById("pager");
+
+const searchForm = document.getElementById("search-form");
+const searchInput = document.getElementById("search-input");
+const searchClear = document.getElementById("search-clear");
+
 
 // -----------------------------------
 // CURRENT DATE
 // -----------------------------------
+//
+// The line under the headline. Every view but
+// search shows today's date; search replaces it
+// with the number of things it found.
 
 const today = new Date();
 
-currentDate.textContent = today.toLocaleDateString("en-US", {
+const TODAY = today.toLocaleDateString("en-US", {
     month: "long",
     day: "numeric",
     year: "numeric"
 });
+
+
+function setDateLine(text) {
+
+    currentDate.textContent = text;
+}
+
+
+setDateLine(TODAY);
 
 
 // -----------------------------------
@@ -31,7 +54,9 @@ currentDate.textContent = today.toLocaleDateString("en-US", {
 const state = {
     tab: "home",
     companyId: null,
-    companyName: null
+    companyName: null,
+    query: "",
+    page: 1
 };
 
 
@@ -48,10 +73,50 @@ const state = {
 //   #/companies           the company list
 //   #/companies/openai    one company
 //   #/discovery           discovery
+//   #/search/gpt-5        search results
+//
+// Search lives at its own address like every
+// other view, so a set of results can be
+// linked, reloaded, and backed out of.
+//
+// Any of them can carry a page on the end:
+//
+//   #/p2                  home, second page
+//   #/companies/openai/p3
+//   #/search/gpt-5/p2
+//
+// Page one is left off, so the ordinary address
+// of a view never grows a suffix.
 //
 // Hash routing rather than pushState: this
 // page is usually opened straight from disk,
 // and pushState is blocked on file:// URLs.
+
+const PAGE_PATTERN = /^p(\d+)$/;
+
+
+// Takes a trailing page marker off the address
+// and returns the page it named.
+//
+// "keep" is how many parts the view itself needs.
+// Without it a search for "p2" would read as page
+// two of an empty query.
+
+function takePage(parts, keep) {
+
+    const match = PAGE_PATTERN.exec(
+        parts[parts.length - 1] || ""
+    );
+
+    if (!match || parts.length <= keep) {
+        return 1;
+    }
+
+    parts.pop();
+
+    return Math.max(1, Number(match[1]));
+}
+
 
 function parseRoute() {
 
@@ -64,15 +129,38 @@ function parseRoute() {
 
         return {
             tab: "companies",
-            companyId: parts[1] ? decodeURIComponent(parts[1]) : null
+            page: takePage(parts, 1),
+            companyId: parts[1] ? decodeURIComponent(parts[1]) : null,
+            query: ""
         };
     }
 
     if (parts[0] === "discovery") {
-        return { tab: "discovery", companyId: null };
+
+        return {
+            tab: "discovery",
+            page: takePage(parts, 1),
+            companyId: null,
+            query: ""
+        };
     }
 
-    return { tab: "home", companyId: null };
+    if (parts[0] === "search") {
+
+        return {
+            tab: "search",
+            page: takePage(parts, 2),
+            companyId: null,
+            query: parts[1] ? decodeURIComponent(parts[1]) : ""
+        };
+    }
+
+    return {
+        tab: "home",
+        page: takePage(parts, 0),
+        companyId: null,
+        query: ""
+    };
 }
 
 
@@ -83,6 +171,54 @@ function routeFor(tab, companyId) {
     }
 
     return tab === "home" ? "#/" : `#/${tab}`;
+}
+
+
+function routeForSearch(query) {
+
+    return `#/search/${encodeURIComponent(query)}`;
+}
+
+
+function withPage(route, page) {
+
+    if (page <= 1) {
+        return route;
+    }
+
+    return route === "#/"
+        ? `#/p${page}`
+        : `${route}/p${page}`;
+}
+
+
+// The address of the view being looked at,
+// without its page, so the pager can build
+// the one either side of it.
+
+function currentRoute() {
+
+    if (state.tab === "search") {
+        return routeForSearch(state.query);
+    }
+
+    return routeFor(state.tab, state.companyId);
+}
+
+
+// Searching for what is already on screen leaves
+// the address unchanged, and an unchanged address
+// fires no hashchange, so redraw it directly.
+
+function navigate(hash) {
+
+    if (window.location.hash === hash) {
+
+        applyRoute();
+        return;
+    }
+
+    window.location.hash = hash;
 }
 
 
@@ -144,6 +280,28 @@ function setHeading(label, title) {
 
 
 function applyHeading() {
+
+    // A query is arbitrary text, so it cannot be
+    // set at the size the fixed headlines use
+    headline.classList.toggle(
+        "headline--query",
+        state.tab === "search"
+    );
+
+    if (state.tab === "search") {
+
+        eyebrow.textContent = "SEARCH";
+
+        headline.textContent = `\u201C${state.query}\u201D`;
+
+        // Replaced with a count once the results
+        // are actually back
+        setDateLine("");
+
+        return;
+    }
+
+    setDateLine(TODAY);
 
     if (state.companyId) {
 
@@ -222,10 +380,19 @@ async function applyRoute() {
 
     state.tab = route.tab;
     state.companyId = route.companyId;
+    state.query = route.query;
+    state.page = route.page;
 
     state.companyName = route.companyId
         ? await companyName(route.companyId)
         : null;
+
+    // Whatever the address says is what the box
+    // says, so the back button and a pasted link
+    // both leave it showing the right thing
+    searchInput.value = state.query;
+
+    showClearButton();
 
     markActiveTab();
     applyHeading();
@@ -249,18 +416,73 @@ window.addEventListener("hashchange", applyRoute);
 // LOAD ARTICLES
 // -----------------------------------
 
+function pageSize() {
+
+    return state.tab === "search"
+        ? SEARCH_RESULTS_PER_PAGE
+        : ARTICLES_PER_PAGE;
+}
+
+
+function articleQuery() {
+
+    const params = new URLSearchParams();
+
+    if (state.tab === "search") {
+        params.set("q", state.query);
+    }
+    else if (state.companyId) {
+        params.set("company", state.companyId);
+    }
+    else {
+        params.set("tab", state.tab);
+    }
+
+    const size = pageSize();
+
+    params.set("limit", size);
+
+    const offset = (state.page - 1) * size;
+
+    if (offset) {
+        params.set("offset", offset);
+    }
+
+    return params;
+}
+
+
+function countLine(total) {
+
+    if (!total) {
+        return "No results";
+    }
+
+    return total === 1 ? "1 result" : `${total} results`;
+}
+
+
 async function loadArticles() {
 
     companyList.hidden = true;
     newsFeed.hidden = false;
 
+    // Whatever the last view's pager said is not
+    // true of this one until its articles are back
+    hidePager();
+
     newsFeed.innerHTML = `<p class="loading">Loading…</p>`;
 
-    const query = state.companyId
-        ? `?company=${encodeURIComponent(state.companyId)}`
-        : `?tab=${encodeURIComponent(state.tab)}`;
+    // A search route with nothing in it is not a
+    // search, so send the visitor home instead of
+    // asking the server for everything
+    if (state.tab === "search" && !state.query.trim()) {
 
-    const url = `${API}/api/articles${query}&limit=${ARTICLES_PER_PAGE}`;
+        navigate("#/");
+        return;
+    }
+
+    const url = `${API}/api/articles?${articleQuery()}`;
 
     try {
 
@@ -272,11 +494,33 @@ async function loadArticles() {
 
         const data = await response.json();
 
-        displayArticles(data.articles);
+        if (state.tab === "search") {
+
+            // Before the cap, so the page can say how
+            // much it found and not just how much it
+            // is willing to show
+            setDateLine(countLine(data.total_available));
+
+            displayArticles(
+                data.articles,
+                "Nothing matched that."
+            );
+        }
+        else {
+
+            displayArticles(data.articles);
+        }
+
+        displayPager(
+            data.total_available,
+            data.articles.length
+        );
 
     } catch (error) {
 
         console.error("Error loading articles:", error);
+
+        hidePager();
 
         newsFeed.innerHTML = `
             <p class="error">Unable to load articles.</p>
@@ -294,6 +538,8 @@ async function loadCompanies() {
     newsFeed.hidden = true;
     companyList.hidden = false;
 
+    hidePager();
+
     companyList.innerHTML = `<p class="loading">Loading…</p>`;
 
     try {
@@ -308,6 +554,113 @@ async function loadCompanies() {
             <p class="error">Unable to load companies.</p>
         `;
     }
+}
+
+
+// -----------------------------------
+// PAGER
+// -----------------------------------
+//
+// A view shows one page at a time so that the
+// footer is always within reach, but nothing
+// drops off the end: whatever the page does not
+// hold is one link away, and both links are real
+// addresses, so the back button walks back
+// through the pages you came from.
+
+function hidePager() {
+
+    pager.hidden = true;
+
+    pager.innerHTML = "";
+
+    newsFeed.classList.remove("news-feed--paged");
+}
+
+
+function pagerLink(route, label) {
+
+    const link = document.createElement("a");
+
+    link.className = "pager-link";
+    link.href = route;
+    link.textContent = label;
+
+    return link;
+}
+
+
+// Holds the empty side so the count stays put
+// whether or not there is a link beside it
+
+function pagerGap() {
+
+    const gap = document.createElement("span");
+
+    gap.className = "pager-gap";
+
+    return gap;
+}
+
+
+function displayPager(total, shown) {
+
+    // Worked out here rather than read back off the
+    // response: this page asked for the offset, so
+    // it already knows it, and a reply that is not
+    // shaped as expected should still paginate
+    const offset = (state.page - 1) * pageSize();
+
+    const hasPrevious = state.page > 1;
+
+    const hasNext = offset + shown < total;
+
+    if (!hasPrevious && !hasNext) {
+
+        hidePager();
+        return;
+    }
+
+    pager.innerHTML = "";
+
+    const base = currentRoute();
+
+    pager.appendChild(
+        hasPrevious
+            ? pagerLink(
+                withPage(base, state.page - 1),
+                "\u2190 Previous"
+            )
+            : pagerGap()
+    );
+
+
+    const count = document.createElement("span");
+
+    count.className = "pager-count";
+
+    // An address can name a page past the end, so
+    // say the total rather than an empty range
+    count.textContent = shown
+        ? `${offset + 1}\u2013${offset + shown} of ${total}`
+        : `${total} in total`;
+
+    pager.appendChild(count);
+
+
+    pager.appendChild(
+        hasNext
+            ? pagerLink(
+                withPage(base, state.page + 1),
+                "Load next \u2192"
+            )
+            : pagerGap()
+    );
+
+
+    pager.hidden = false;
+
+    newsFeed.classList.add("news-feed--paged");
 }
 
 
@@ -399,15 +752,20 @@ function displayCompanies(companies) {
 // DISPLAY ARTICLES
 // -----------------------------------
 
-function displayArticles(articles) {
+function displayArticles(articles, emptyMessage) {
 
     newsFeed.innerHTML = "";
 
     if (!articles.length) {
 
-        newsFeed.innerHTML = `
-            <p class="error">Nothing here right now.</p>
-        `;
+        const message = document.createElement("p");
+
+        message.className = "error";
+
+        message.textContent =
+            emptyMessage || "Nothing here right now.";
+
+        newsFeed.appendChild(message);
 
         return;
     }
@@ -594,6 +952,66 @@ function cleanDescription(description) {
 
     return temp.textContent || temp.innerText || "";
 }
+
+
+// -----------------------------------
+// SEARCH
+// -----------------------------------
+//
+// The pill in the navbar. Submitting it moves
+// to the search route, and everything else on
+// the page reacts to that address the same way
+// it reacts to any other.
+
+function showClearButton() {
+
+    searchClear.hidden = !searchInput.value;
+}
+
+
+searchInput.addEventListener("input", showClearButton);
+
+
+searchForm.addEventListener("submit", event => {
+
+    event.preventDefault();
+
+    const query = searchInput.value.trim();
+
+    // Clicking the magnifying glass on an empty
+    // box should open the box, not run a search
+    if (!query) {
+
+        searchInput.focus();
+        return;
+    }
+
+    navigate(routeForSearch(query));
+});
+
+
+searchClear.addEventListener("click", () => {
+
+    searchInput.value = "";
+
+    showClearButton();
+
+    searchInput.focus();
+
+    // Clearing the box you searched from should
+    // clear the results it produced
+    if (state.tab === "search") {
+        navigate("#/");
+    }
+});
+
+
+searchInput.addEventListener("keydown", event => {
+
+    if (event.key === "Escape") {
+        searchInput.blur();
+    }
+});
 
 
 // -----------------------------------

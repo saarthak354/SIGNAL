@@ -37,9 +37,43 @@
             <a href="#/discovery" data-tab="discovery">Discovery</a>
         </nav>
 
-        <button class="search-button">
-            Search
-        </button>
+        <!-- The magnifying glass is the submit
+             button, so the whole pill is one
+             working control -->
+
+        <form class="search" id="search-form" role="search">
+
+            <button type="submit"
+                    class="search-submit"
+                    aria-label="Search">
+
+                <svg class="search-icon"
+                     viewBox="0 0 20 20"
+                     aria-hidden="true">
+
+                    <circle cx="8.75" cy="8.75" r="5.75"></circle>
+                    <line x1="13" y1="13" x2="17.5" y2="17.5"></line>
+
+                </svg>
+
+            </button>
+
+            <input type="search"
+                   id="search-input"
+                   class="search-input"
+                   placeholder="Search"
+                   autocomplete="off"
+                   spellcheck="false"
+                   maxlength="100"
+                   aria-label="Search articles">
+
+            <button type="button"
+                    class="search-clear"
+                    id="search-clear"
+                    aria-label="Clear search"
+                    hidden>&times;</button>
+
+        </form>
 
     </header>
 
@@ -94,6 +128,21 @@
             -->
 
         </section>
+
+
+        <!-- =========================
+             PAGER
+        ========================== -->
+
+        <nav class="pager" id="pager" aria-label="Pagination" hidden>
+
+            <!--
+                JavaScript inserts the previous and
+                next links here whenever a view holds
+                more articles than one page shows.
+            -->
+
+        </nav>
 
     </main>
 

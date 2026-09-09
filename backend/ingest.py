@@ -7,7 +7,8 @@ from news import fetch_rss_sources
 from scrape import scrape_website
 from filters import filter_articles, HOME_WINDOW_DAYS, RETENTION_DAYS
 from sources import all_sources
-from classify import detect_company
+from classify import detect_company, company_from_url
+from search import search
 
 
 # -----------------------------------
@@ -36,17 +37,33 @@ _lock = threading.Lock()
 
 def tag(article, source):
 
-    is_company = source["category"] == "company"
+    # Which feed carried a story does not decide
+    # whose story it is. An aggregator linking
+    # straight at a company's own site has handed
+    # us that company's own post, and that belongs
+    # with the rest of them: Discovery is for what
+    # other people wrote, not for a company blog
+    # that happened to arrive by a different road.
+    if source["category"] == "company":
 
-    article["category"] = source["category"]
+        company_id = source["id"]
+        company_name = source["name"]
 
-    article["company"] = (
-        source["name"] if is_company else None
+    else:
+
+        company_id, company_name = company_from_url(
+            article.get("url", "")
+        )
+
+    is_company = bool(company_id)
+
+    article["category"] = (
+        "company" if is_company else "discovery"
     )
 
-    article["company_id"] = (
-        source["id"] if is_company else None
-    )
+    article["company"] = company_name
+
+    article["company_id"] = company_id
 
     # Which feed carried the story. For Discovery
     # the card credits the site being linked to,
@@ -213,7 +230,13 @@ def within_home_window(articles):
     ]
 
 
-def select(articles, tab=None, company_id=None, limit=None):
+def select(articles, tab=None, company_id=None, query=None):
+
+    # Search reaches across every tab and back
+    # through everything retained, not just the
+    # fortnight the feed itself shows
+    if query:
+        return search(articles, query)
 
     # A single company: show its full history so
     # a quiet publisher never renders an empty page
@@ -242,8 +265,16 @@ def select(articles, tab=None, company_id=None, limit=None):
 #
 # A page nobody can scroll to the bottom of
 # has no footer, so every list is capped.
+#
+# The cap is a window, not a cut off: whatever
+# falls outside it is still reachable by asking
+# for the next offset, so a company with a
+# hundred posts keeps all hundred.
 
-def paginate(articles, limit=None):
+def paginate(articles, limit=None, offset=0):
+
+    if offset:
+        articles = articles[offset:]
 
     if not limit:
         return articles
