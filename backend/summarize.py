@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 import time
 
@@ -116,6 +117,69 @@ PAUSE_SECONDS = float(os.environ.get("GEMINI_PAUSE", "1.5"))
 # article, and a summary of a blurb is worse than
 # the blurb itself.
 MIN_FEED_TEXT = 700
+
+
+# -----------------------------------
+# HOW MUCH BOLD IS TOO MUCH
+# -----------------------------------
+#
+# The prompt asks for five or six spans. Asking
+# does not work: a third of the first run came
+# back over, and rewriting them with a firmer
+# instruction left almost as many over again --
+# the worst went from seventeen spans to
+# eighteen. Models do not count their own
+# emphasis well.
+#
+# So the rule is enforced here instead, where it
+# is arithmetic rather than persuasion.
+#
+# What survives is chosen rather than truncated:
+# the spans carrying a number are the ones the
+# story usually turns on -- a valuation, a
+# benchmark, a version -- so they are kept first,
+# then the earliest of the rest. Everything else
+# loses its markers and stays as text, so no
+# words are lost, only the shouting.
+
+MAX_BOLD = 6
+
+BOLD_SPAN = re.compile(r"\*\*(.+?)\*\*", re.S)
+
+
+def cap_bold(text):
+
+    spans = list(BOLD_SPAN.finditer(text))
+
+    if len(spans) <= MAX_BOLD:
+        return text
+
+    ranked = sorted(
+        range(len(spans)),
+        key=lambda i: (
+            0 if any(c.isdigit() for c in spans[i].group(1)) else 1,
+            i
+        )
+    )
+
+    keep = set(ranked[:MAX_BOLD])
+
+    out = []
+    cursor = 0
+
+    for index, span in enumerate(spans):
+
+        out.append(text[cursor:span.start()])
+
+        out.append(
+            span.group(0) if index in keep else span.group(1)
+        )
+
+        cursor = span.end()
+
+    out.append(text[cursor:])
+
+    return "".join(out)
 
 
 class NotConfigured(RuntimeError):
@@ -349,7 +413,7 @@ def ask_model(article, body, model=None, thinking=False):
             "the summary was cut off before it finished"
         )
 
-    return (response.text or "").strip()
+    return cap_bold((response.text or "").strip())
 
 
 def _ran_out_of_room(response):
