@@ -181,3 +181,54 @@ create policy "articles are public"
     for select
     to anon, authenticated
     using (true);
+
+
+-- -----------------------------------
+-- SUMMARIES
+-- -----------------------------------
+--
+-- Added after the fact, so these are ALTERs
+-- rather than part of the table above. Re-running
+-- the whole file stays safe.
+--
+-- The summary is written once, when an article
+-- first arrives, and read on every open. Doing it
+-- the other way round -- writing it when somebody
+-- clicks -- would mean the first reader of every
+-- article waits for a model, and the same article
+-- gets summarised again on every machine that has
+-- not cached it. Dedupe already guarantees one row
+-- per story, so this way each story costs exactly
+-- one summary, ever.
+--
+--   status  pending   never attempted
+--           ok        summary is there
+--           thin      no readable article at that URL
+--                     (paywall, consent wall, JS-only page)
+--           failed    the model or the fetch errored; retried
+
+alter table public.articles
+    add column if not exists summary        text;
+
+alter table public.articles
+    add column if not exists summary_status text not null default 'pending';
+
+alter table public.articles
+    add column if not exists summary_model  text;
+
+alter table public.articles
+    add column if not exists summary_error  text;
+
+alter table public.articles
+    add column if not exists summarized_at  timestamptz;
+
+alter table public.articles
+    add column if not exists summary_attempts integer not null default 0;
+
+
+-- The summariser's own query: what still needs
+-- one, newest first. Partial, because the rows
+-- it wants are the minority and shrinking.
+create index if not exists articles_summary_pending_idx
+    on public.articles (published desc)
+    where summary_status in ('pending', 'failed');

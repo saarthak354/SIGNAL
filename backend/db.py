@@ -147,11 +147,64 @@ def client():
 # the only place that shape meets the table, so
 # nothing else has to know a database exists.
 
-COLUMNS = (
+BASE_COLUMNS = (
     "id, url, url_key, title, description, source, via, source_tier, "
     "category, company, company_id, related_company, related_company_id, "
     "published, updated"
 )
+
+COLUMNS = BASE_COLUMNS + ", summary, summary_status"
+
+
+# -----------------------------------
+# BEFORE THE MIGRATION
+# -----------------------------------
+#
+# The summary columns arrived after the table
+# did, so a store that has not had schema.sql
+# re-run yet does not have them, and asking for
+# them fails the read outright.
+#
+# A site that goes dark because a column is
+# missing is worse than one that serves articles
+# without summaries, so the first read finds out
+# which kind of store this is and every read
+# after it knows. Applying the migration heals
+# it on the next restart.
+#
+# Safe to delete this, and the fallback in
+# read_rows, once every store has been migrated.
+
+MISSING_COLUMN = "42703"
+
+_has_summaries = None
+
+
+def article_columns():
+
+    if _has_summaries is False:
+        return BASE_COLUMNS
+
+    return COLUMNS
+
+
+def note_missing_summaries():
+
+    global _has_summaries
+
+    if _has_summaries is None:
+
+        print(
+            "The articles table has no summary columns yet, so articles "
+            "will open without one. Run backend/schema.sql to add them."
+        )
+
+    _has_summaries = False
+
+
+def is_missing_column(error):
+
+    return MISSING_COLUMN in str(error) or "does not exist" in str(error)
 
 
 def to_row(article):
@@ -189,6 +242,12 @@ def to_row(article):
 def to_article(row):
 
     return {
+        # The feed needs a stable handle on a row
+        # to open it, and a URL is not one: it is
+        # long, it is arbitrary text, and it does
+        # not belong in an address bar.
+        "id": row.get("id"),
+
         "title": row.get("title"),
         "url": row.get("url"),
         "description": row.get("description") or "",
@@ -205,6 +264,9 @@ def to_article(row):
         "related_company_id": row.get("related_company_id"),
 
         "source_tier": row.get("source_tier") or "aggregator",
+
+        "summary": row.get("summary"),
+        "summary_status": row.get("summary_status") or "pending",
     }
 
 
@@ -235,14 +297,27 @@ def read_rows(columns, window_days=RETENTION_DAYS):
 
     while True:
 
-        response = (
-            supabase.table(ARTICLES)
-            .select(columns)
-            .gte("published", cutoff(window_days))
-            .order("published", desc=True)
-            .range(start, start + PAGE_SIZE - 1)
-            .execute()
-        )
+        try:
+
+            response = (
+                supabase.table(ARTICLES)
+                .select(columns)
+                .gte("published", cutoff(window_days))
+                .order("published", desc=True)
+                .range(start, start + PAGE_SIZE - 1)
+                .execute()
+            )
+
+        except Exception as error:
+
+            if columns == COLUMNS and is_missing_column(error):
+
+                note_missing_summaries()
+
+                columns = BASE_COLUMNS
+                continue
+
+            raise
 
         page = response.data or []
 
@@ -258,7 +333,7 @@ def load_articles(window_days=RETENTION_DAYS):
 
     return [
         to_article(row)
-        for row in read_rows(COLUMNS, window_days)
+        for row in read_rows(article_columns(), window_days)
     ]
 
 
@@ -418,6 +493,112 @@ def sync_articles(articles, window_days=RETENTION_DAYS):
         "refreshed": len(seen_again),
         "replaced": len(superseded),
     }
+
+
+# -----------------------------------
+# SUMMARIES
+# -----------------------------------
+
+SUMMARY_COLUMNS = "id, url, title, source, published, summary_attempts"
+
+# A summary that failed is worth another go --
+# a site was briefly down, the model timed out --
+# but not forever, or a page that will never be
+# readable is retried until the end of time.
+MAX_SUMMARY_ATTEMPTS = 3
+
+
+def article(article_id):
+    """One row, by id. Used when a reader opens it."""
+
+    supabase = client()
+
+    try:
+
+        response = (
+            supabase.table(ARTICLES)
+            .select(article_columns())
+            .eq("id", article_id)
+            .limit(1)
+            .execute()
+        )
+
+    except Exception as error:
+
+        if not is_missing_column(error):
+            raise
+
+        note_missing_summaries()
+
+        response = (
+            supabase.table(ARTICLES)
+            .select(BASE_COLUMNS)
+            .eq("id", article_id)
+            .limit(1)
+            .execute()
+        )
+
+    rows = response.data or []
+
+    return to_article(rows[0]) if rows else None
+
+
+def articles_needing_summary(limit=50, window_days=RETENTION_DAYS):
+    """
+    What to work through next, newest first, so
+    the front page fills in before the archive.
+    """
+
+    supabase = client()
+
+    response = (
+        supabase.table(ARTICLES)
+        .select(SUMMARY_COLUMNS)
+        .gte("published", cutoff(window_days))
+        .in_("summary_status", ["pending", "failed"])
+        .lt("summary_attempts", MAX_SUMMARY_ATTEMPTS)
+        .order("published", desc=True)
+        .limit(limit)
+        .execute()
+    )
+
+    return response.data or []
+
+
+def save_summary(article_id, summary, status, model=None, error=None, attempts=0):
+
+    supabase = client()
+
+    supabase.table(ARTICLES).update({
+        "summary": summary,
+        "summary_status": status,
+        "summary_model": model,
+        "summary_error": error,
+        "summary_attempts": attempts + 1,
+        "summarized_at": datetime.now(timezone.utc).isoformat(),
+    }).eq("id", article_id).execute()
+
+
+def summary_counts(window_days=RETENTION_DAYS):
+
+    supabase = client()
+
+    tally = {}
+
+    for status in ("ok", "pending", "failed", "thin"):
+
+        response = (
+            supabase.table(ARTICLES)
+            .select("id", count="exact")
+            .gte("published", cutoff(window_days))
+            .eq("summary_status", status)
+            .limit(1)
+            .execute()
+        )
+
+        tally[status] = response.count or 0
+
+    return tally
 
 
 # -----------------------------------

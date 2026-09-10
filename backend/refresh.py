@@ -16,6 +16,7 @@ on a schedule:
 import sys
 
 import db
+import summarize
 
 from ingest import refresh
 
@@ -52,6 +53,28 @@ def main():
         f"{run['inserted']} new, "
         f"{run['refreshed']} still live, "
         f"{run['replaced']} replaced by a better source"
+    )
+
+    # Written here rather than when a reader opens
+    # the article, so opening one is a database
+    # read and nothing else.
+    if not summarize.configured():
+
+        print(
+            "\nGEMINI_API_KEY is not set, so nothing was summarised.\n"
+            "Get a free key at https://aistudio.google.com/apikey"
+        )
+
+        return 0
+
+    print("\nSummarising what is new")
+
+    done = summarize.run()
+
+    print(
+        f"{done['ok']} written, "
+        f"{done['thin']} had no readable article, "
+        f"{done['failed']} failed"
     )
 
     return 0

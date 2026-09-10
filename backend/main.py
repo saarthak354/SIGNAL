@@ -4,6 +4,7 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 
 import db
+import summarize
 
 from ingest import get_articles, select, paginate
 from sources import companies
@@ -189,6 +190,76 @@ def submit():
 
 
 # -----------------------------------
+# ONE ARTICLE
+# -----------------------------------
+#
+# What the reader gets when they open a card:
+# the article, and a summary long enough to
+# stand in for it.
+#
+# Nearly always this is a single read, because
+# the summary was written when the article was
+# ingested. The fallback is for the gap between
+# an article arriving and the summariser reaching
+# it -- and for anyone running the server without
+# the cron job. In that case one reader waits a
+# few seconds and everybody after them does not.
+
+@app.route("/api/articles/<int:article_id>")
+def one_article(article_id):
+
+    try:
+        article = db.article(article_id)
+
+    except Exception as error:
+
+        return jsonify({
+            "error": f"Could not read the store: {type(error).__name__}"
+        }), 503
+
+    if not article:
+        return jsonify({"error": "No such article."}), 404
+
+    if article.get("summary_status") == "ok":
+        return jsonify({"article": article})
+
+    # Nothing written yet, and no key to write it
+    if not summarize.configured():
+        return jsonify({"article": article})
+
+    # A page we already know we cannot read
+    if article.get("summary_status") == "thin":
+        return jsonify({"article": article})
+
+    summary, status, error = summarize.summarize({
+        "id": article_id,
+        "url": article["url"],
+        "title": article["title"],
+        "source": article["source"],
+    })
+
+    try:
+        db.save_summary(
+            article_id,
+            summary,
+            status,
+            model=summarize.MODEL if status == "ok" else None,
+            error=error
+        )
+
+    except Exception:
+
+        # The reader still gets their summary even
+        # if we could not keep it
+        pass
+
+    article["summary"] = summary
+    article["summary_status"] = status
+
+    return jsonify({"article": article})
+
+
+# -----------------------------------
 # HEALTH
 # -----------------------------------
 #
@@ -228,8 +299,16 @@ def health():
             "detail": "Connected, but nothing has been ingested yet. Run: python refresh.py"
         })
 
+    try:
+        summaries = db.summary_counts()
+
+    except Exception:
+        summaries = None
+
     return jsonify({
         "database": "ok",
+        "summaries": summaries,
+        "summariser": summarize.MODEL if summarize.configured() else "unconfigured",
         "last_ingest": {
             "started_at": run["started_at"],
             "finished_at": run["finished_at"],

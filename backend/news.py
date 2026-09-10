@@ -1,3 +1,4 @@
+import html
 import re
 
 import feedparser
@@ -30,12 +31,70 @@ def clean_description(value):
 
     text = re.sub(r"<[^>]+>", " ", value)
 
+    # Feeds escape their markup, so stripping the
+    # tags leaves the entities behind: without this
+    # a card reads "OpenAI&#8217;s" and a summary is
+    # handed the same thing to work from.
+    text = html.unescape(text)
+
     text = re.sub(r"\s+", " ", text).strip()
 
     if text.lower().strip(" .") in BOILERPLATE:
         return ""
 
     return text
+
+
+# -----------------------------------
+# THE ARTICLE, IF THE FEED CARRIES IT
+# -----------------------------------
+#
+# Most feeds hand over a headline and a blurb.
+# Some hand over the whole article in
+# <content:encoded>, and that is worth keeping:
+# it is text we already have, so summarising
+# from it costs no fetch at all -- and it is the
+# only text we will ever get from a publisher
+# whose own pages are behind a bot check.
+#
+# Ars Technica is exactly that case. Its pages
+# answer an AWS WAF JavaScript challenge that no
+# plain HTTP client can pass, but its feed gives
+# a thousand words of every story.
+
+MAX_FEED_TEXT = 24000
+
+
+def feed_text(entry):
+
+    best = ""
+
+    for block in entry.get("content") or []:
+
+        value = block.get("value") or ""
+
+        if len(value) > len(best):
+            best = value
+
+    # Some feeds put the article in the summary
+    # and leave content empty
+    summary = entry.get("summary") or ""
+
+    if len(summary) > len(best):
+        best = summary
+
+    if not best:
+        return ""
+
+    text = re.sub(r"<(script|style)[^>]*>.*?</\1>", " ", best, flags=re.S | re.I)
+
+    text = re.sub(r"<[^>]+>", " ", text)
+
+    text = html.unescape(text)
+
+    text = re.sub(r"\s+", " ", text).strip()
+
+    return text[:MAX_FEED_TEXT]
 
 
 # -----------------------------------
@@ -192,7 +251,11 @@ def fetch_rss_sources(sources):
                     "updated": article.get(
                         "updated",
                         ""
-                    )
+                    ),
+
+                    # Kept for the summariser, not
+                    # for the card
+                    "feed_text": feed_text(article)
                 }
 
                 articles.append(news_item)
