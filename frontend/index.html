@@ -11,6 +11,27 @@
     <link rel="apple-touch-icon" sizes="180x180" href="logos/favicon-180.png">
 
     <link rel="stylesheet" href="style.css">
+
+    <!--
+        Inline and before the stylesheet's first
+        paint on purpose. Loading this with app.js
+        at the end of the body would render the
+        whole page light and then correct it, and
+        that white flash is the one thing a dark
+        theme must never do.
+    -->
+    <script>
+        (function () {
+            try {
+                var saved = localStorage.getItem("signal-theme");
+                if (saved === "dark" || saved === "light") {
+                    document.documentElement.setAttribute("data-theme", saved);
+                }
+            } catch (error) {
+                /* Private browsing: fall back to the system setting */
+            }
+        })();
+    </script>
 </head>
 
 <body>
@@ -40,6 +61,8 @@
         <!-- The magnifying glass is the submit
              button, so the whole pill is one
              working control -->
+
+        <div class="navbar-actions">
 
         <form class="search" id="search-form" role="search">
 
@@ -74,6 +97,43 @@
                     hidden>&times;</button>
 
         </form>
+
+        <!-- Light and dark. The icon shows the
+             theme you would switch TO, which is
+             the one people reach for. -->
+
+        <button type="button"
+                class="theme-toggle"
+                id="theme-toggle"
+                aria-label="Switch to dark mode">
+
+            <svg class="theme-icon theme-icon--sun"
+                 viewBox="0 0 24 24"
+                 aria-hidden="true">
+
+                <circle cx="12" cy="12" r="4.6"></circle>
+                <line x1="12" y1="1.8" x2="12" y2="4.2"></line>
+                <line x1="12" y1="19.8" x2="12" y2="22.2"></line>
+                <line x1="1.8" y1="12" x2="4.2" y2="12"></line>
+                <line x1="19.8" y1="12" x2="22.2" y2="12"></line>
+                <line x1="4.8" y1="4.8" x2="6.5" y2="6.5"></line>
+                <line x1="17.5" y1="17.5" x2="19.2" y2="19.2"></line>
+                <line x1="4.8" y1="19.2" x2="6.5" y2="17.5"></line>
+                <line x1="17.5" y1="6.5" x2="19.2" y2="4.8"></line>
+
+            </svg>
+
+            <svg class="theme-icon theme-icon--moon"
+                 viewBox="0 0 24 24"
+                 aria-hidden="true">
+
+                <path d="M20.5 14.3A8.6 8.6 0 0 1 9.7 3.5a8.6 8.6 0 1 0 10.8 10.8z"></path>
+
+            </svg>
+
+        </button>
+
+        </div>
 
     </header>
 
@@ -111,6 +171,20 @@
             <!--
                 JavaScript inserts one row
                 per company here.
+            -->
+
+        </section>
+
+
+        <!-- =========================
+             ARTICLE
+        ========================== -->
+
+        <section class="article-view" id="article-view" hidden>
+
+            <!--
+                JavaScript inserts the opened
+                article and its summary here.
             -->
 
         </section>

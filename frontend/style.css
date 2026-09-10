@@ -1,4 +1,171 @@
 /* =================================
+   THEME
+================================= */
+/* Every colour in this file is one of these.
+   Nothing below sets a colour literal, so the
+   whole site changes by swapping this block.
+
+   Two things stay put across both themes. The
+   navbar and footer are always the dark bracket
+   the page sits between — in light mode they are
+   the darkest thing on screen, in dark mode the
+   page catches up with them — so their own inks
+   barely move. And the accents keep their jobs:
+   green means it worked, red means it did not.
+
+   Naming: "ink" is text on the page, "bar-ink"
+   is text on that bracket, "rule" is a hairline,
+   "surface" is anything raised off the page. */
+
+:root {
+    color-scheme: light;
+
+    --bg:              #f8f8f6;
+    --surface:         #ffffff;
+    --surface-sunken:  #fbfbfa;
+    --surface-hover:   #f4f4f1;
+
+    --ink:             #111111;
+    --ink-strong:      #000000;
+    --ink-body:        #1a1a1a;
+    --ink-quiet:       #333333;
+    --ink-secondary:   #707070;
+    --ink-muted:       #777777;
+    --ink-meta:        #888888;
+    --ink-faint:       #999999;
+    --ink-ghost:       #b8b8b2;
+
+    /* Text sitting on top of an inked surface,
+       so it inverts with it */
+    --on-ink:          #ffffff;
+
+    --rule:            #dededb;
+    --rule-strong:     #c9c9c4;
+
+    --bar:             #2b2b28;
+    --bar-ink:         #f8f8f6;
+    --bar-ink-strong:  #ffffff;
+    --bar-ink-soft:    #e6e6e1;
+    --bar-ink-quiet:   #bdbdb6;
+    --bar-ink-muted:   #9a9a92;
+    --bar-ink-faint:   #8f8f88;
+    --bar-rule:        #3d3d39;
+
+    --ok:              #1a7f4b;
+    --error:           #b3261e;
+
+    --shadow:          rgba(0, 0, 0, 0.16);
+    --backdrop:        rgba(17, 17, 17, 0.35);
+
+    /* The page gutter. One value, shared by the
+       hero, the feed, the company list and the
+       article, so every left edge on the site
+       lines up at every width -- and grows with
+       the viewport rather than stepping at a
+       breakpoint. */
+    --gutter:          clamp(20px, 4.5vw, 40px);
+}
+
+
+/* Dark is not the light palette inverted. Pure
+   black with pure white on it glares, and the
+   warmth the paper had would be lost, so the
+   greys keep a little of the same yellow and
+   the brightest text stops short of white. */
+
+:root[data-theme="dark"] {
+    color-scheme: dark;
+
+    --bg:              #141412;
+    --surface:         #1e1e1b;
+    --surface-sunken:  #191916;
+    --surface-hover:   #262622;
+
+    --ink:             #f2f2ee;
+    --ink-strong:      #ffffff;
+    --ink-body:        #e8e8e3;
+    --ink-quiet:       #c6c6c0;
+    --ink-secondary:   #a4a49c;
+    --ink-muted:       #9a9a92;
+    --ink-meta:        #8e8e86;
+    --ink-faint:       #85857d;
+    --ink-ghost:       #4a4a44;
+
+    --on-ink:          #141412;
+
+    --rule:            #2c2c28;
+    --rule-strong:     #46463f;
+
+    /* The bracket goes darker than the page
+       rather than lighter, so it still reads as
+       an edge and not as a panel floating on top */
+    --bar:             #0e0e0c;
+    --bar-ink:         #f2f2ee;
+    --bar-ink-strong:  #ffffff;
+    --bar-ink-soft:    #e6e6e1;
+    --bar-ink-quiet:   #b0b0a9;
+    --bar-ink-muted:   #90908a;
+    --bar-ink-faint:   #85857d;
+    --bar-rule:        #262622;
+
+    /* Lifted off the dark ground, or they read
+       as brown and rust rather than as signals */
+    --ok:              #46b277;
+    --error:           #ef6b63;
+
+    --shadow:          rgba(0, 0, 0, 0.5);
+    --backdrop:        rgba(0, 0, 0, 0.68);
+}
+
+
+/* Nobody has chosen yet, so follow the system.
+   Guarded, so that choosing light on a machine
+   set to dark still gives you light. */
+
+@media (prefers-color-scheme: dark) {
+
+    :root:not([data-theme="light"]) {
+        color-scheme: dark;
+
+        --bg:              #141412;
+        --surface:         #1e1e1b;
+        --surface-sunken:  #191916;
+        --surface-hover:   #262622;
+
+        --ink:             #f2f2ee;
+        --ink-strong:      #ffffff;
+        --ink-body:        #e8e8e3;
+        --ink-quiet:       #c6c6c0;
+        --ink-secondary:   #a4a49c;
+        --ink-muted:       #9a9a92;
+        --ink-meta:        #8e8e86;
+        --ink-faint:       #85857d;
+        --ink-ghost:       #4a4a44;
+
+        --on-ink:          #141412;
+
+        --rule:            #2c2c28;
+        --rule-strong:     #46463f;
+
+        --bar:             #0e0e0c;
+        --bar-ink:         #f2f2ee;
+        --bar-ink-strong:  #ffffff;
+        --bar-ink-soft:    #e6e6e1;
+        --bar-ink-quiet:   #b0b0a9;
+        --bar-ink-muted:   #90908a;
+        --bar-ink-faint:   #85857d;
+        --bar-rule:        #262622;
+
+        --ok:              #46b277;
+        --error:           #ef6b63;
+
+        --shadow:          rgba(0, 0, 0, 0.5);
+        --backdrop:        rgba(0, 0, 0, 0.68);
+    }
+}
+
+
+/* =================================
    RESET
 ================================= */
 
@@ -24,8 +191,8 @@
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
-    background: #f8f8f6;
-    color: #111111;
+    background: var(--bg);
+    color: var(--ink);
     line-height: 1.5;
 }
 
@@ -42,11 +209,19 @@ body {
     align-items: center;
     justify-content: space-between;
 
-    padding: 0 6vw;
+    /* Never narrower than a thumb's margin, never
+       wider than the page gutter below it */
+    padding: 0 clamp(20px, 6vw, 64px);
+
+    /* A floor under the space between the logo
+       and the controls. Without it, space-between
+       gives them nothing at 320px and the search
+       pill ends up touching the wordmark. */
+    column-gap: 14px;
 
     /* Same warm dark grey as the footer, so the
        page is bracketed top and bottom */
-    background: #2b2b28;
+    background: var(--bar);
 }
 
 .logo {
@@ -59,7 +234,7 @@ body {
     font-weight: 700;
     letter-spacing: -0.03em;
 
-    color: #f8f8f6;
+    color: var(--bar-ink);
 }
 
 .logo-mark {
@@ -75,12 +250,32 @@ body {
 
 .navbar nav {
     display: flex;
-    gap: 36px;
+
+    /* The first thing to give when the bar runs
+       out of room, so the links stay on one line
+       for as long as they can */
+    gap: clamp(18px, 3.4vw, 36px);
+}
+
+/* Search and the theme button travel together,
+   so the navbar still has three parts and
+   space-between still balances them */
+.navbar-actions {
+    display: flex;
+    align-items: center;
+
+    gap: 10px;
+
+    /* So the search can give up width on a narrow
+       phone instead of pushing the row wider than
+       the screen. A flex item will not shrink
+       below its content unless it is told it may. */
+    min-width: 0;
 }
 
 .navbar nav a {
     text-decoration: none;
-    color: #bdbdb6;
+    color: var(--bar-ink-quiet);
 
     font-size: 14px;
     font-weight: 500;
@@ -89,12 +284,156 @@ body {
 }
 
 .navbar nav a:hover {
-    color: #ffffff;
+    color: var(--bar-ink-strong);
 }
 
 .navbar nav a.active {
-    color: #ffffff;
+    color: var(--bar-ink-strong);
 }
+
+/* =================================
+   NAVBAR — WHEN ONE ROW STOPS FITTING
+================================= */
+/* Logo, three links, a search pill and a button
+   need about 880px before they start crowding
+   each other. Below that they get two rows.
+   
+   Not a hamburger: there are three links, and
+   hiding three links behind a tap to save one
+   row of height is a worse trade than the row.
+   
+   The previous version hid the nav entirely
+   below 700px, which left a phone with no way
+   to reach Companies or Discovery at all -- the
+   two things the site is for. */
+
+@media (max-width: 880px) {
+
+    .navbar {
+        height: auto;
+
+        flex-wrap: wrap;
+
+        padding: 13px clamp(20px, 4.5vw, 40px) 0;
+    }
+
+    .navbar nav {
+        order: 3;
+
+        width: 100%;
+
+        justify-content: space-between;
+        gap: 0;
+
+        margin-top: 13px;
+        padding: 13px 2px;
+
+        border-top: 1px solid var(--bar-rule);
+    }
+
+    .navbar nav a {
+        font-size: 15px;
+    }
+
+    .navbar-actions {
+        gap: 8px;
+    }
+}
+
+
+/* =================================
+   THEME TOGGLE
+================================= */
+/* Sits on the dark bracket next to the search
+   pill and borrows its treatment, so the navbar
+   reads as one set of controls rather than a
+   search box with a button stuck beside it. */
+
+.theme-toggle {
+    flex-shrink: 0;
+
+    width: 36px;
+    height: 36px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    background: rgba(248, 248, 246, 0.08);
+
+    border: 1px solid rgba(248, 248, 246, 0.14);
+    border-radius: 999px;
+
+    color: var(--bar-ink-quiet);
+
+    cursor: pointer;
+
+    transition:
+        background 0.2s ease,
+        border-color 0.2s ease,
+        color 0.2s ease;
+}
+
+.theme-toggle:hover {
+    background: rgba(248, 248, 246, 0.12);
+    border-color: rgba(248, 248, 246, 0.22);
+
+    color: var(--bar-ink-strong);
+}
+
+.theme-toggle:focus-visible {
+    outline: 2px solid rgba(248, 248, 246, 0.34);
+    outline-offset: 2px;
+}
+
+.theme-icon {
+    width: 17px;
+    height: 17px;
+
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+}
+
+/* The moon is filled rather than drawn — a
+   crescent in outline reads as a fingernail */
+.theme-icon--moon {
+    fill: currentColor;
+    stroke: none;
+}
+
+/* Show the theme you would switch TO: a moon
+   while you are in the light, a sun while you
+   are in the dark. */
+
+.theme-icon--sun {
+    display: none;
+}
+
+.theme-icon--moon {
+    display: block;
+}
+
+:root[data-theme="dark"] .theme-icon--sun {
+    display: block;
+}
+
+:root[data-theme="dark"] .theme-icon--moon {
+    display: none;
+}
+
+@media (prefers-color-scheme: dark) {
+
+    :root:not([data-theme="light"]) .theme-icon--sun {
+        display: block;
+    }
+
+    :root:not([data-theme="light"]) .theme-icon--moon {
+        display: none;
+    }
+}
+
 
 /* =================================
    SEARCH
@@ -105,6 +444,8 @@ body {
    sitting on top */
 
 .search {
+    min-width: 0;
+
     display: flex;
     align-items: center;
 
@@ -155,7 +496,7 @@ body {
 
     padding: 0;
 
-    color: #bdbdb6;
+    color: var(--bar-ink-quiet);
 
     cursor: pointer;
 
@@ -164,7 +505,7 @@ body {
 
 .search-submit:hover,
 .search:focus-within .search-submit {
-    color: #ffffff;
+    color: var(--bar-ink-strong);
 }
 
 .search-icon {
@@ -184,6 +525,8 @@ body {
 /* THE FIELD */
 
 .search-input {
+    min-width: 0;
+
     /* Narrow at rest so it reads as a button,
        and opens up once it is being used */
     width: 120px;
@@ -195,13 +538,13 @@ body {
     font-family: inherit;
     font-size: 14px;
 
-    color: #f8f8f6;
+    color: var(--bar-ink);
 
     transition: width 0.25s ease;
 }
 
 .search-input::placeholder {
-    color: #8f8f88;
+    color: var(--bar-ink-faint);
 }
 
 .search-input:focus {
@@ -239,7 +582,7 @@ body {
     font-size: 15px;
     line-height: 1;
 
-    color: #d6d6d0;
+    color: var(--bar-ink-quiet);
 
     cursor: pointer;
 
@@ -251,7 +594,7 @@ body {
 .search-clear:hover {
     background: rgba(248, 248, 246, 0.22);
 
-    color: #ffffff;
+    color: var(--bar-ink-strong);
 }
 
 
@@ -273,7 +616,12 @@ main {
 
     margin: 0 auto;
 
-    padding: 120px 40px 90px;
+    /* Everything on the page shares this gutter,
+       and it grows with the viewport rather than
+       jumping at a breakpoint */
+    padding: clamp(56px, 9vw, 120px)
+             var(--gutter)
+             clamp(48px, 7vw, 90px);
 }
 
 .eyebrow {
@@ -282,13 +630,16 @@ main {
 
     letter-spacing: 0.14em;
 
-    color: #777777;
+    color: var(--ink-muted);
 
     margin-bottom: 24px;
 }
 
 .intro h1 {
-    font-size: clamp(52px, 7vw, 96px);
+    /* Reaches down to 36px so it still reads as a
+       headline on a 320px phone instead of
+       breaking "Without" across two lines */
+    font-size: clamp(36px, 8.2vw, 96px);
 
     font-weight: 500;
 
@@ -304,7 +655,7 @@ main {
 
     font-size: 14px;
 
-    color: #888888;
+    color: var(--ink-meta);
 }
 
 
@@ -317,7 +668,7 @@ main {
 
     margin: 0 auto;
 
-    padding: 0 40px 100px;
+    padding: 0 var(--gutter) clamp(64px, 9vw, 100px);
 }
 
 
@@ -330,7 +681,7 @@ main {
 
     padding: 34px 0;
 
-    border-top: 1px solid #dededb;
+    border-top: 1px solid var(--rule);
 
     cursor: pointer;
 
@@ -340,7 +691,7 @@ main {
 }
 
 .news-item:last-child {
-    border-bottom: 1px solid #dededb;
+    border-bottom: 1px solid var(--rule);
 }
 
 .news-item:hover {
@@ -372,7 +723,7 @@ main {
 .article-meta span:last-child {
     font-size: 12px;
 
-    color: #888888;
+    color: var(--ink-meta);
 }
 
 
@@ -406,7 +757,7 @@ main {
 
     line-height: 1.6;
 
-    color: #707070;
+    color: var(--ink-secondary);
 }
 
 
@@ -426,7 +777,7 @@ main {
 
     text-transform: uppercase;
 
-    color: #777777;
+    color: var(--ink-muted);
 }
 
 
@@ -460,7 +811,7 @@ main {
 .news-feed--editorial .news-item {
     padding: 22px 0 34px;
 
-    border-top: 1px solid #dededb;
+    border-top: 1px solid var(--rule);
     border-bottom: none;
 }
 
@@ -560,7 +911,7 @@ main {
 
     letter-spacing: 0.08em;
 
-    color: #b8b8b2;
+    color: var(--ink-ghost);
 
     font-variant-numeric: tabular-nums;
 
@@ -568,7 +919,7 @@ main {
 }
 
 .news-item:hover .article-index {
-    color: #111111;
+    color: var(--ink);
 }
 
 .news-feed--editorial .news-item--lead .article-index {
@@ -595,7 +946,7 @@ main {
 
     margin: 0 auto;
 
-    padding: 0 40px 100px;
+    padding: 0 var(--gutter) clamp(64px, 9vw, 100px);
 
     display: flex;
     align-items: center;
@@ -614,7 +965,7 @@ main {
 .pager-link {
     /* Echoes the search pill, so the two things
        you can click on a page match */
-    border: 1px solid #dededb;
+    border: 1px solid var(--rule);
     border-radius: 999px;
 
     padding: 11px 20px;
@@ -622,7 +973,7 @@ main {
     font-size: 14px;
     font-weight: 500;
 
-    color: #111111;
+    color: var(--ink);
 
     text-decoration: none;
 
@@ -635,11 +986,11 @@ main {
 }
 
 .pager-link:hover {
-    background: #111111;
+    background: var(--ink);
 
-    border-color: #111111;
+    border-color: var(--ink);
 
-    color: #ffffff;
+    color: var(--on-ink);
 }
 
 /* Holds the space on whichever side has no
@@ -651,7 +1002,7 @@ main {
 .pager-count {
     font-size: 12px;
 
-    color: #888888;
+    color: var(--ink-meta);
 
     white-space: nowrap;
 }
@@ -686,7 +1037,7 @@ main {
 }
 
 .back-link:hover {
-    color: #111111;
+    color: var(--ink);
 }
 
 
@@ -699,7 +1050,7 @@ main {
 
     margin: 0 auto;
 
-    padding: 0 40px 100px;
+    padding: 0 var(--gutter) clamp(64px, 9vw, 100px);
 }
 
 .company-item {
@@ -717,7 +1068,7 @@ main {
 
     padding: 34px 0;
 
-    border-top: 1px solid #dededb;
+    border-top: 1px solid var(--rule);
 
     cursor: pointer;
 
@@ -727,7 +1078,7 @@ main {
 }
 
 .company-item:last-child {
-    border-bottom: 1px solid #dededb;
+    border-bottom: 1px solid var(--rule);
 }
 
 .company-item:hover {
@@ -754,9 +1105,9 @@ main {
     align-items: center;
     justify-content: center;
 
-    background: #ffffff;
+    background: var(--surface);
 
-    border: 1px solid #e5e5e2;
+    border: 1px solid var(--rule);
     border-radius: 10px;
 
     overflow: hidden;
@@ -781,13 +1132,13 @@ main {
     font-size: 16px;
     font-weight: 600;
 
-    color: #111111;
+    color: var(--ink);
 }
 
 .company-item:hover .company-logo {
     transform: scale(1.06);
 
-    border-color: #d8d8d4;
+    border-color: var(--rule-strong);
 }
 
 .company-item h2 {
@@ -805,7 +1156,7 @@ main {
 
     font-size: 12px;
 
-    color: #888888;
+    color: var(--ink-meta);
 }
 
 
@@ -817,7 +1168,7 @@ main {
     /* A warm dark grey, not black, so it sits
        against the off-white page without going
        heavy at the bottom of every view */
-    background: #2b2b28;
+    background: var(--bar);
 }
 
 .footer-inner {
@@ -847,7 +1198,7 @@ main {
 
     letter-spacing: -0.03em;
 
-    color: #f8f8f6;
+    color: var(--bar-ink);
 }
 
 .footer-tagline {
@@ -855,7 +1206,7 @@ main {
 
     font-size: 15px;
 
-    color: #e6e6e1;
+    color: var(--bar-ink-soft);
 }
 
 .footer-about {
@@ -865,7 +1216,7 @@ main {
 
     line-height: 1.6;
 
-    color: #a8a8a1;
+    color: var(--bar-ink-muted);
 }
 
 
@@ -879,7 +1230,7 @@ main {
 
     text-transform: uppercase;
 
-    color: #9a9a92;
+    color: var(--bar-ink-muted);
 }
 
 .footer-column ul {
@@ -895,7 +1246,7 @@ main {
 .footer-column a {
     font-size: 14px;
 
-    color: #bdbdb6;
+    color: var(--bar-ink-quiet);
 
     text-decoration: none;
 
@@ -903,7 +1254,7 @@ main {
 }
 
 .footer-column a:hover {
-    color: #ffffff;
+    color: var(--bar-ink-strong);
 }
 
 
@@ -921,11 +1272,11 @@ main {
 
     gap: 24px;
 
-    border-top: 1px solid #3d3d39;
+    border-top: 1px solid var(--bar-rule);
 
     font-size: 12px;
 
-    color: #9a9a92;
+    color: var(--bar-ink-muted);
 }
 
 
@@ -943,7 +1294,7 @@ main {
     font-family: inherit;
     font-size: 14px;
 
-    color: #bdbdb6;
+    color: var(--bar-ink-quiet);
 
     cursor: pointer;
 
@@ -951,7 +1302,7 @@ main {
 }
 
 .footer-action:hover {
-    color: #ffffff;
+    color: var(--bar-ink-strong);
 }
 
 
@@ -971,15 +1322,15 @@ main {
     border: none;
     border-radius: 14px;
 
-    background: #ffffff;
+    background: var(--surface);
 
-    color: #111111;
+    color: var(--ink);
 
-    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.16);
+    box-shadow: 0 24px 60px var(--shadow);
 }
 
 .modal::backdrop {
-    background: rgba(17, 17, 17, 0.35);
+    background: var(--backdrop);
 }
 
 .modal-panel {
@@ -1012,7 +1363,7 @@ main {
     font-size: 26px;
     line-height: 1;
 
-    color: #999999;
+    color: var(--ink-faint);
 
     cursor: pointer;
 
@@ -1020,7 +1371,7 @@ main {
 }
 
 .modal-close:hover {
-    color: #111111;
+    color: var(--ink);
 }
 
 
@@ -1038,7 +1389,7 @@ main {
 
     text-transform: uppercase;
 
-    color: #777777;
+    color: var(--ink-muted);
 }
 
 .modal input,
@@ -1051,11 +1402,11 @@ main {
     font-family: inherit;
     font-size: 15px;
 
-    color: #111111;
+    color: var(--ink);
 
-    background: #fbfbfa;
+    background: var(--surface-sunken);
 
-    border: 1px solid #e0e0dc;
+    border: 1px solid var(--rule);
     border-radius: 8px;
 
     resize: vertical;
@@ -1067,7 +1418,7 @@ main {
 .modal textarea:focus {
     outline: none;
 
-    border-color: #111111;
+    border-color: var(--ink);
 }
 
 .modal textarea {
@@ -1084,15 +1435,15 @@ main {
 
     font-size: 13px;
 
-    color: #888888;
+    color: var(--ink-meta);
 }
 
 .form-status--error {
-    color: #b3261e;
+    color: var(--error);
 }
 
 .form-status--ok {
-    color: #1a7f4b;
+    color: var(--ok);
 }
 
 
@@ -1125,29 +1476,29 @@ main {
 }
 
 .button-quiet {
-    border: 1px solid #e0e0dc;
+    border: 1px solid var(--rule);
 
     background: transparent;
 
-    color: #707070;
+    color: var(--ink-secondary);
 }
 
 .button-quiet:hover {
-    color: #111111;
+    color: var(--ink);
 
-    background: #f4f4f1;
+    background: var(--surface-hover);
 }
 
 .button-solid {
-    border: 1px solid #111111;
+    border: 1px solid var(--ink);
 
-    background: #111111;
+    background: var(--ink);
 
-    color: #ffffff;
+    color: var(--on-ink);
 }
 
 .button-solid:hover {
-    background: #000000;
+    background: var(--ink-strong);
 }
 
 .button-solid:disabled {
@@ -1165,7 +1516,7 @@ main {
 .loading {
     padding: 40px 0;
 
-    color: #888888;
+    color: var(--ink-meta);
 
     font-size: 14px;
 }
@@ -1206,41 +1557,24 @@ main {
 
 @media (max-width: 700px) {
 
-    .navbar {
-        padding: 0 24px;
-    }
-
-    .navbar nav {
-        display: none;
-    }
-
     .search-input {
-        width: 92px;
+        width: 84px;
     }
 
     .search-input:focus {
-        width: 140px;
+        width: 124px;
     }
 
     .intro {
-        padding: 80px 24px 60px;
+        padding-bottom: clamp(40px, 8vw, 60px);
     }
 
-    .intro h1 {
-        font-size: 52px;
-    }
-
-    .news-feed {
-        padding: 0 24px 80px;
-    }
 
     .news-feed--paged {
         padding-bottom: 32px;
     }
 
     .pager {
-        padding: 0 24px 80px;
-
         gap: 12px;
     }
 
@@ -1285,9 +1619,6 @@ main {
         font-size: 21px;
     }
 
-    .company-list {
-        padding: 0 24px 80px;
-    }
 
     .company-item {
         padding: 28px 0;
@@ -1316,7 +1647,7 @@ main {
 
         gap: 40px;
 
-        padding: 50px 24px 40px;
+        padding: 50px var(--gutter) 40px;
     }
 
     .footer-bottom {
@@ -1324,11 +1655,245 @@ main {
 
         gap: 10px;
 
-        padding: 20px 24px 32px;
+        padding: 20px var(--gutter) 32px;
     }
 
     .modal-panel {
         padding: 24px;
     }
 
+}
+
+/* =================================
+   ARTICLE VIEW
+================================= */
+/* One article, read rather than scanned.
+
+   The feed is a grid of things competing for
+   attention; this is the opposite, so it drops
+   to a single measured column and takes the
+   width away from everything else on the page.
+
+   The palette is the site's own — the same warm
+   paper, the same ink, the same hairline rules —
+   because this is still SIGNAL, just standing
+   still for a moment. */
+
+/* The same 1100px container as the hero above
+   it, so the summary starts on the same left
+   edge as the headline it belongs to. The
+   reading measure is set on the text itself
+   rather than by narrowing the container --
+   centring a narrower box here pushed the prose
+   about 190px to the right of its own title. */
+
+.article-view {
+    max-width: 1100px;
+
+    margin: 0 auto;
+
+    padding: 0 var(--gutter) clamp(72px, 10vw, 120px);
+}
+
+/* Around 68 characters a line, which is where
+   prose stops being work to read. */
+.article-subject,
+.summary,
+.article-original {
+    max-width: 680px;
+}
+
+
+/* Who the story is about, above the summary,
+   in the same small caps the cards use for the
+   same job. */
+
+.article-subject {
+    margin-bottom: 26px;
+
+    font-size: 11px;
+    font-weight: 600;
+
+    letter-spacing: 0.08em;
+
+    text-transform: uppercase;
+
+    color: var(--ink-muted);
+}
+
+
+/* =================================
+   THE SUMMARY
+================================= */
+
+.summary {
+    border-top: 1px solid var(--rule);
+
+    padding-top: 34px;
+}
+
+.summary p {
+    /* Larger than the feed. This is the one
+       thing on the page meant to be read all
+       the way through. */
+    font-size: 18px;
+
+    line-height: 1.75;
+
+    color: var(--ink-body);
+}
+
+.summary p + p {
+    margin-top: 22px;
+}
+
+/* The first line carries the weight — it is
+   what a reader decides on. */
+.summary p:first-child {
+    font-size: 19px;
+}
+
+/* Emphasis the model was asked for. Bold is
+   ink, not colour: it marks the name or the
+   number the sentence turns on, and a colour
+   here would read as a link. */
+.summary strong {
+    font-weight: 650;
+
+    color: var(--ink);
+}
+
+.summary em {
+    font-style: italic;
+
+    color: var(--ink-quiet);
+}
+
+/* Why a summary is missing, when one is. Set
+   quieter than the prose, because it is a note
+   about the page rather than part of it. */
+.summary-note {
+    margin-top: 22px;
+
+    font-size: 14px !important;
+    font-style: italic;
+
+    color: var(--ink-meta) !important;
+}
+
+
+/* =================================
+   THE ORIGINAL
+================================= */
+/* Last, and deliberately so. The summary is
+   written to leave the reader informed, so the
+   source is somewhere to go afterwards, not the
+   next step. */
+
+.article-original {
+    margin-top: 48px;
+    padding-top: 26px;
+
+    border-top: 1px solid var(--rule);
+}
+
+.article-original a {
+    display: inline-flex;
+    align-items: center;
+
+    gap: 8px;
+
+    font-size: 14px;
+    font-weight: 600;
+
+    color: var(--ink);
+
+    text-decoration: none;
+
+    border-bottom: 1px solid var(--rule-strong);
+
+    padding-bottom: 3px;
+
+    transition:
+        border-color 0.2s ease,
+        gap 0.2s ease;
+}
+
+.article-original a:hover {
+    border-color: var(--ink);
+
+    /* The arrow leans away as you reach it */
+    gap: 12px;
+}
+
+
+/* =================================
+   ARTICLE VIEW — NARROW SCREENS
+================================= */
+
+@media (max-width: 700px) {
+
+
+    .summary p,
+    .summary p:first-child {
+        font-size: 17px;
+    }
+}
+
+
+/* =================================
+   TOUCH TARGETS
+================================= */
+/* A pointer lands where it is aimed; a thumb
+   lands in a circle roughly 44px across. These
+   controls are all small text or a small icon,
+   which is fine to click and fiddly to tap, so
+   on touch screens they grow a hit area without
+   growing visually.
+
+   Scoped to (hover: none) rather than to a
+   width, because what matters is the input
+   device, not the size of the window. */
+
+@media (hover: none) and (pointer: coarse) {
+
+    .navbar nav {
+        /* Given back by the links below, so the
+           bar does not get taller */
+        padding-top: 2px;
+        padding-bottom: 2px;
+    }
+
+    .navbar nav a {
+        padding: 11px 2px;
+    }
+
+    .search-submit {
+        /* Covers the left end of the pill, which
+           is where the icon looks like it is */
+        padding: 10px 4px 10px 2px;
+        margin: -10px 0;
+    }
+
+    .search-clear {
+        min-width: 30px;
+        min-height: 30px;
+    }
+
+    .footer-action,
+    .footer-column a {
+        padding: 7px 0;
+    }
+
+    .back-link {
+        display: inline-block;
+
+        padding: 8px 0;
+        margin: -8px 0;
+    }
+
+    .article-original a {
+        padding-top: 10px;
+        padding-bottom: 10px;
+    }
 }

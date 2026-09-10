@@ -15,6 +15,7 @@ const HOME_ARTICLES_PER_PAGE = 6;
 
 const newsFeed = document.getElementById("news-feed");
 const companyList = document.getElementById("company-list");
+const articleView = document.getElementById("article-view");
 const currentDate = document.getElementById("current-date");
 const eyebrow = document.getElementById("eyebrow");
 const headline = document.getElementById("headline");
@@ -61,8 +62,113 @@ const state = {
     companyId: null,
     companyName: null,
     query: "",
-    page: 1
+    page: 1,
+
+    // The article being read, and the address to
+    // put the reader back on when they leave it
+    articleId: null,
+    returnTo: null
 };
+
+
+// -----------------------------------
+// LIGHT AND DARK
+// -----------------------------------
+//
+// Three states, not two. "light" and "dark" are
+// choices; no attribute at all means follow the
+// machine, which is what a first-time visitor
+// gets and what most people want.
+//
+// The attribute is already on <html> by the time
+// this runs -- index.html sets it inline in the
+// head, before the first paint, so the page never
+// flashes the wrong theme. This half only handles
+// the switching.
+
+const THEME_KEY = "signal-theme";
+
+const themeToggle = document.getElementById("theme-toggle");
+
+
+function systemPrefersDark() {
+
+    return window.matchMedia
+        && window.matchMedia("(prefers-color-scheme: dark)").matches;
+}
+
+
+function currentTheme() {
+
+    const chosen = document.documentElement.getAttribute("data-theme");
+
+    if (chosen === "dark" || chosen === "light") {
+        return chosen;
+    }
+
+    return systemPrefersDark() ? "dark" : "light";
+}
+
+
+function applyTheme(theme) {
+
+    document.documentElement.setAttribute("data-theme", theme);
+
+    try {
+        localStorage.setItem(THEME_KEY, theme);
+
+    } catch (error) {
+        // Private browsing. The theme still applies
+        // for this visit, it just will not be
+        // remembered for the next one.
+    }
+
+    describeToggle();
+}
+
+
+// The button's label has to say what it will do,
+// not what is currently true, or a screen reader
+// announces the opposite of what happens.
+
+function describeToggle() {
+
+    if (!themeToggle) {
+        return;
+    }
+
+    const next = currentTheme() === "dark" ? "light" : "dark";
+
+    themeToggle.setAttribute("aria-label", `Switch to ${next} mode`);
+    themeToggle.setAttribute("title", `Switch to ${next} mode`);
+}
+
+
+if (themeToggle) {
+
+    themeToggle.addEventListener("click", () => {
+
+        applyTheme(currentTheme() === "dark" ? "light" : "dark");
+    });
+
+    describeToggle();
+}
+
+
+// Somebody who has never chosen is following the
+// system, so the page should keep following it if
+// the system changes under them.
+
+if (window.matchMedia) {
+
+    window.matchMedia("(prefers-color-scheme: dark)")
+        .addEventListener("change", () => {
+
+            if (!document.documentElement.getAttribute("data-theme")) {
+                describeToggle();
+            }
+        });
+}
 
 
 // -----------------------------------
@@ -79,6 +185,7 @@ const state = {
 //   #/companies/openai    one company
 //   #/discovery           discovery
 //   #/search/gpt-5        search results
+//   #/article/1234        one article, with its summary
 //
 // Search lives at its own address like every
 // other view, so a set of results can be
@@ -129,6 +236,17 @@ function parseRoute() {
         .replace(/^#\/?/, "")
         .split("/")
         .filter(Boolean);
+
+    if (parts[0] === "article") {
+
+        return {
+            tab: "article",
+            page: 1,
+            companyId: null,
+            query: "",
+            articleId: parts[1] ? decodeURIComponent(parts[1]) : null
+        };
+    }
 
     if (parts[0] === "companies") {
 
@@ -185,6 +303,12 @@ function routeForSearch(query) {
 }
 
 
+function routeForArticle(id) {
+
+    return `#/article/${encodeURIComponent(id)}`;
+}
+
+
 function withPage(route, page) {
 
     if (page <= 1) {
@@ -208,6 +332,12 @@ function currentRoute() {
     }
 
     return routeFor(state.tab, state.companyId);
+}
+
+
+function currentRouteWithPage() {
+
+    return withPage(currentRoute(), state.page);
 }
 
 
@@ -290,8 +420,31 @@ function applyHeading() {
     // set at the size the fixed headlines use
     headline.classList.toggle(
         "headline--query",
-        state.tab === "search"
+        state.tab === "search" || state.tab === "article"
     );
+
+    // The eyebrow doubles as the way back, the
+    // same as it does on a company page. The
+    // headline is filled in once the article is
+    // actually here.
+    if (state.tab === "article") {
+
+        eyebrow.innerHTML = "";
+
+        const back = document.createElement("a");
+
+        back.className = "back-link";
+        back.href = state.returnTo || "#/";
+        back.textContent = "\u2190 Back";
+
+        eyebrow.appendChild(back);
+
+        headline.textContent = "";
+
+        setDateLine("");
+
+        return;
+    }
 
     if (state.tab === "search") {
 
@@ -383,10 +536,20 @@ async function applyRoute() {
 
     const route = parseRoute();
 
+    // Where "Back" goes: the view being left,
+    // remembered before the address changes to
+    // the article. Reaching an article from a
+    // pasted link has nothing to remember, so
+    // that falls back to the feed.
+    if (route.tab === "article" && state.tab !== "article") {
+        state.returnTo = currentRouteWithPage();
+    }
+
     state.tab = route.tab;
     state.companyId = route.companyId;
     state.query = route.query;
     state.page = route.page;
+    state.articleId = route.articleId || null;
 
     state.companyName = route.companyId
         ? await companyName(route.companyId)
@@ -404,7 +567,10 @@ async function applyRoute() {
 
     window.scrollTo(0, 0);
 
-    if (state.tab === "companies" && !state.companyId) {
+    if (state.tab === "article") {
+        loadArticle();
+    }
+    else if (state.tab === "companies" && !state.companyId) {
         loadCompanies();
     }
     else {
@@ -415,6 +581,41 @@ async function applyRoute() {
 
 
 window.addEventListener("hashchange", applyRoute);
+
+
+// -----------------------------------
+// THE LOADING STATE
+// -----------------------------------
+//
+// Now that the feed is served from the store,
+// most loads finish in single-digit milliseconds.
+// Painting "Loading" before every one of them put
+// a spinner on screen for a single frame, which
+// the eye catches as a flicker and reads as the
+// page stuttering -- the opposite of what a
+// loading state is for.
+//
+// So it waits. Anything that answers quickly
+// never shows one at all, and anything genuinely
+// slow still says so.
+
+const LOADER_DELAY = 150;
+
+
+function showLoading(element) {
+
+    const timer = setTimeout(() => {
+
+        element.innerHTML = `<p class="loading">Loading\u2026</p>`;
+
+    }, LOADER_DELAY);
+
+    // Called on every way out, including the
+    // failures: a loader left armed would land
+    // on top of an error message a moment after
+    // it was written.
+    return () => clearTimeout(timer);
+}
 
 
 // -----------------------------------
@@ -478,18 +679,21 @@ function countLine(total) {
 async function loadArticles() {
 
     companyList.hidden = true;
+    articleView.hidden = true;
     newsFeed.hidden = false;
 
     // Whatever the last view's pager said is not
     // true of this one until its articles are back
     hidePager();
 
-    newsFeed.innerHTML = `<p class="loading">Loading…</p>`;
+    const doneLoading = showLoading(newsFeed);
 
     // A search route with nothing in it is not a
     // search, so send the visitor home instead of
     // asking the server for everything
     if (state.tab === "search" && !state.query.trim()) {
+
+        doneLoading();
 
         navigate("#/");
         return;
@@ -506,6 +710,8 @@ async function loadArticles() {
         }
 
         const data = await response.json();
+
+        doneLoading();
 
         if (state.tab === "search") {
 
@@ -533,10 +739,198 @@ async function loadArticles() {
 
         console.error("Error loading articles:", error);
 
+        doneLoading();
+
         hidePager();
 
         newsFeed.innerHTML = `
             <p class="error">Unable to load articles.</p>
+        `;
+    }
+}
+
+
+// -----------------------------------
+// OPEN ONE ARTICLE
+// -----------------------------------
+//
+// The summary is the page. It is written to be
+// complete enough that opening the original is
+// a choice rather than the next step, so the
+// link to it sits at the bottom, after the
+// reading rather than in place of it.
+
+
+// The summary comes back as Markdown, and it is
+// the only HTML on this page that is not written
+// here, so it is escaped first and then given
+// back exactly the three things the prompt asks
+// for: paragraphs, bold and italic. Anything
+// else the model emits stays as text.
+//
+// Escaping before formatting, never after: the
+// other way round would let an article title
+// containing a tag close one of ours.
+
+function escapeHtml(text) {
+
+    return String(text)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+}
+
+
+function renderSummary(markdown) {
+
+    return escapeHtml(markdown)
+        .split(/\n\s*\n/)
+        .map(block => block.trim())
+        .filter(Boolean)
+        .map(block => {
+
+            const inline = block
+                .replace(/\n/g, " ")
+
+                // Bold first: its markers would
+                // otherwise read as two italics
+                .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+                .replace(/(^|[^*])\*([^*\n]+)\*/g, "$1<em>$2</em>")
+                .replace(/_([^_\n]+)_/g, "<em>$1</em>");
+
+            return `<p>${inline}</p>`;
+        })
+        .join("");
+}
+
+
+// What to say when there is no summary, which
+// depends on why. None of these are errors the
+// reader can do anything about, so none of them
+// are dressed up as one.
+
+const NO_SUMMARY = {
+
+    thin:
+        "The original page could not be read \u2014 usually a paywall, " +
+        "a consent screen, or an article that builds itself in the browser.",
+
+    failed:
+        "The summary could not be written this time. It will be retried.",
+
+    pending:
+        "No summary yet."
+};
+
+
+function summaryFallback(article) {
+
+    const note = NO_SUMMARY[article.summary_status] || NO_SUMMARY.pending;
+
+    // The blurb is thin, but it is what we have,
+    // and it beats an empty page
+    const blurb = cleanDescription(article.description);
+
+    return `
+        ${blurb ? `<p>${escapeHtml(blurb)}</p>` : ""}
+        <p class="summary-note">${note}</p>
+    `;
+}
+
+
+function displayArticle(article) {
+
+    headline.textContent = article.title;
+
+    setDateLine(
+        [article.source, formatDate(article.published)]
+            .filter(Boolean)
+            .join("  \u00B7  ")
+    );
+
+    const body = article.summary
+        ? renderSummary(article.summary)
+        : summaryFallback(article);
+
+    const subject = article.category === "discovery"
+        ? article.related_company
+        : article.company;
+
+    articleView.innerHTML = `
+
+        ${subject ? `<div class="article-subject">${escapeHtml(subject)}</div>` : ""}
+
+        <div class="summary">${body}</div>
+
+        <div class="article-original">
+
+            <a href="${escapeHtml(article.url)}"
+               target="_blank"
+               rel="noopener noreferrer">
+                Read the original at ${escapeHtml(article.source || "the source")}
+                <span aria-hidden="true">\u2197</span>
+            </a>
+
+        </div>
+    `;
+}
+
+
+async function loadArticle() {
+
+    newsFeed.hidden = true;
+    companyList.hidden = true;
+    articleView.hidden = false;
+
+    hidePager();
+
+    const doneLoading = showLoading(articleView);
+
+    if (!state.articleId) {
+
+        doneLoading();
+
+        navigate("#/");
+        return;
+    }
+
+    try {
+
+        const response = await fetch(
+            `${API}/api/articles/${encodeURIComponent(state.articleId)}`
+        );
+
+        doneLoading();
+
+        if (response.status === 404) {
+
+            headline.textContent = "Article not found";
+
+            articleView.innerHTML = `
+                <p class="error">
+                    That article is no longer in the feed.
+                </p>
+            `;
+
+            return;
+        }
+
+        if (!response.ok) {
+            throw new Error("Failed to fetch the article");
+        }
+
+        displayArticle((await response.json()).article);
+
+    } catch (error) {
+
+        console.error("Error loading article:", error);
+
+        doneLoading();
+
+        headline.textContent = "";
+
+        articleView.innerHTML = `
+            <p class="error">Unable to load this article.</p>
         `;
     }
 }
@@ -549,19 +943,26 @@ async function loadArticles() {
 async function loadCompanies() {
 
     newsFeed.hidden = true;
+    articleView.hidden = true;
     companyList.hidden = false;
 
     hidePager();
 
-    companyList.innerHTML = `<p class="loading">Loading…</p>`;
+    const doneLoading = showLoading(companyList);
 
     try {
 
-        displayCompanies(await allCompanies());
+        const companies = await allCompanies();
+
+        doneLoading();
+
+        displayCompanies(companies);
 
     } catch (error) {
 
         console.error("Error loading companies:", error);
+
+        doneLoading();
 
         companyList.innerHTML = `
             <p class="error">Unable to load companies.</p>
@@ -931,12 +1332,13 @@ function createArticle(article, position) {
     // CLICK ARTICLE
     // -----------------------------------
 
+    // Its own address, so the summary is a page
+    // like any other: linkable, reloadable, and
+    // backed out of with the browser's own button
+    // as well as the one on the page.
     articleElement.addEventListener("click", () => {
 
-        window.open(
-            article.url,
-            "_blank"
-        );
+        navigate(routeForArticle(article.id));
 
     });
 
@@ -1038,6 +1440,36 @@ function formatTime(dateString) {
     }
 
     return `${days}d ago`;
+}
+
+
+// -----------------------------------
+// FORMAT DATE
+// -----------------------------------
+//
+// A card says "3h ago", because on a feed what
+// matters is how fresh a thing is next to the
+// ones around it. An opened article has nothing
+// to be compared against, so it gets the date
+// it was actually published.
+
+function formatDate(dateString) {
+
+    if (!dateString) {
+        return "";
+    }
+
+    const published = new Date(dateString);
+
+    if (isNaN(published)) {
+        return "";
+    }
+
+    return published.toLocaleDateString("en-US", {
+        month: "long",
+        day: "numeric",
+        year: "numeric"
+    });
 }
 
 
