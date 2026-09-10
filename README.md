@@ -105,39 +105,37 @@ Discovery surfaces articles and discussions from external publishers and communi
 
 ## AI Summaries
 
-Clicking an article opens it inside SIGNAL instead of sending you away.
+SIGNAL provides an AI-generated summary for every article, giving you the key information before you read the full story.
 
-Each article receives a 150-250 word summary containing the names, numbers, and specifics that carry the story, with a link to the original at the bottom.
+Each summary is **150–250 words** and focuses on the names, numbers, events, and specifics that matter to the story. The original article is linked at the end for readers who want to explore further.
 
-Summaries are written when an article is ingested, not when it is clicked.
+Summaries are generated during article ingestion and stored alongside the article. This means they are ready instantly when an article is opened, while each story only needs to be summarized once.
 
-This keeps articles instant to open, and means each story is summarised once no matter how many people read it.
-
-### How a summary is built
+### How a Summary Is Built
 
 ```text
 article URL ──▶ extract.py ──▶ summarize.py ──▶ stored
-                (read the page)  (Gemini)
+                (extract content)  (Gemini)
 ```
 
-Ingestion collects only a headline and a short blurb, so `extract.py` opens the article page itself.
+SIGNAL retrieves the article's content directly from its source before sending it to the summarization model. The extracted content is then processed by Gemini and the resulting summary is stored in the database.
 
-Where a page refuses to open, the source RSS feed is used instead.
+When the full article cannot be extracted, SIGNAL falls back to the information provided by the source feed.
 
-### When there is no summary
+### When a Summary Isn't Available
 
-Some pages cannot be read at all.
+Some articles cannot be reliably extracted because of:
 
 - Paywalls
 - Consent screens
-- Articles rendered in the browser
+- Browser-rendered content
+- Other access restrictions
 
-These are marked `thin` and still open normally, showing the original blurb.
+In these cases, the article remains available with its original description instead of an AI-generated summary.
 
-Nothing is ever dropped for failing to summarise.
+A summarization failure never prevents an article from appearing on SIGNAL.
 
-Without `GEMINI_API_KEY` the site works normally, and articles open with their blurb.
-
+The site also functions normally without a `GEMINI_API_KEY`; articles simply display their original descriptions when a summary is unavailable.
 ---
 
 ## Project Structure
