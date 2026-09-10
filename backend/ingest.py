@@ -46,6 +46,13 @@ _cache = {
 
 _lock = threading.Lock()
 
+# Set while a background refresh is in flight, so
+# ten visitors arriving at once start one refresh
+# between them rather than ten.
+_refreshing = False
+
+_refresh_lock = threading.Lock()
+
 
 # -----------------------------------
 # TAG AN ARTICLE WITH ITS SOURCE
@@ -330,20 +337,91 @@ def reload():
 
 
 # -----------------------------------
+# REFRESH WITHOUT ANYONE WAITING
+# -----------------------------------
+#
+# Going out to the sources takes about three
+# seconds: fifteen feeds, a couple of thousand
+# entries, and a write to the store.
+#
+# That used to happen inside a request, so every
+# ten minutes one visitor opened the site and sat
+# in front of a loading screen for the whole of
+# it while the rest queued behind the lock. They
+# were paying for everybody else's freshness.
+#
+# The store already holds every article, so there
+# is no reason for anyone to wait: the page is
+# served from what we have, and the refresh runs
+# behind it for the next reader. Slightly stale
+# beats visibly slow -- and "stale" here means a
+# feed that is up to ten minutes behind, on a
+# site whose sources publish a few times a day.
+
+def start_background_refresh():
+
+    global _refreshing
+
+    with _refresh_lock:
+
+        if _refreshing:
+            return
+
+        _refreshing = True
+
+    def work():
+
+        global _refreshing
+
+        try:
+            refresh()
+
+        except Exception as error:
+
+            print(
+                f"Background refresh failed: "
+                f"{type(error).__name__}: {error}"
+            )
+
+        finally:
+
+            with _refresh_lock:
+                _refreshing = False
+
+    threading.Thread(
+        target=work,
+        name="signal-refresh",
+        daemon=True
+    ).start()
+
+
+# -----------------------------------
 # CACHED ACCESS
 # -----------------------------------
 
 def get_articles(force=False):
 
+    # Without a store, this process's own last
+    # ingest is the only copy of anything, so it
+    # has to be done here and waited for.
+    if not db.configured():
+
+        with _lock:
+
+            if force or time.time() - _cache["ingested_at"] > INGEST_SECONDS:
+                refresh()
+
+            return _cache
+
     with _lock:
 
-        now = time.time()
-
-        if force or now - _cache["ingested_at"] > INGEST_SECONDS:
+        # An explicit refresh is somebody asking
+        # for it and willing to wait
+        if force:
             refresh()
 
-        if not db.configured():
-            return _cache
+        elif time.time() - _cache["ingested_at"] > INGEST_SECONDS:
+            start_background_refresh()
 
         stale = time.time() - _cache["loaded_at"] > CACHE_SECONDS
 
