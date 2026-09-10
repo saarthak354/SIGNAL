@@ -78,12 +78,15 @@ The goal is simple:
 SIGNAL is split into two primary layers:
 
 ```text
-SIGNAL
+SIGNAL/
 │
 ├── backend/
+│   ├── data/
+│   │
 │   ├── classify.py
 │   ├── dedupe.py
 │   ├── filters.py
+│   ├── homepage.py
 │   ├── ingest.py
 │   ├── main.py
 │   ├── news.py
@@ -94,6 +97,7 @@ SIGNAL
 │
 ├── frontend/
 │   ├── logos/
+│   │
 │   ├── app.js
 │   ├── index.html
 │   └── style.css
