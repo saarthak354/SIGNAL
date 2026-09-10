@@ -8,6 +8,20 @@
     box-sizing: border-box;
 }
 
+/* The browser hides [hidden] with its own
+   "display: none", and any display set in this
+   file outranks it however plain the selector.
+   Several things here are both hidden in JS and
+   given a display — a grid, a flex row — so
+   without this they stay on screen with the
+   attribute set and nothing to show for it.
+
+   One rule, rather than remembering to write
+   a [hidden] case for every new component. */
+[hidden] {
+    display: none !important;
+}
+
 body {
     font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
     background: #f8f8f6;
@@ -238,13 +252,6 @@ body {
     background: rgba(248, 248, 246, 0.22);
 
     color: #ffffff;
-}
-
-/* An author "display" beats the browser's own
-   rule for [hidden], so the attribute has to be
-   honoured explicitly or the button never hides */
-.search-clear[hidden] {
-    display: none;
 }
 
 
@@ -595,12 +602,6 @@ main {
     justify-content: space-between;
 
     gap: 20px;
-}
-
-/* An author "display" beats the browser's own
-   rule for [hidden] */
-.pager[hidden] {
-    display: none;
 }
 
 /* The last article keeps its rule above the
