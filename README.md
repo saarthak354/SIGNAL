@@ -20,9 +20,13 @@ The platform is organized around three primary views:
 
 ### Home
 
-Home brings everything together.
+The Home feed brings everything together.
 
 Company updates and discovery articles are combined into a single chronological feed, with the latest developments appearing first.
+
+The goal is simple:
+
+**Open SIGNAL and see what is happening in AI right now.**
 
 ### Companies
 
@@ -46,7 +50,7 @@ Each company has its own dedicated view containing its latest articles.
 
 Explore AI news from the wider internet.
 
-Discovery surfaces articles and discussions from external publishers and communities, allowing users to discover developments that may not originate directly from an AI company.
+Discovery surfaces articles and discussions from external sources and communities, allowing users to discover developments that may not originate directly from an AI company.
 
 ---
 
@@ -58,48 +62,15 @@ Discovery surfaces articles and discussions from external publishers and communi
 - **Discovery feed for external sources**
 - **Company directory with logos and article counts**
 - **Article source and publication timestamps**
+- **AI-generated article summaries**
 - **Direct links to original articles**
 - **Search functionality**
 - **Duplicate article handling**
 - **Article filtering and classification**
 - **RSS and web-based ingestion**
-- **AI summaries — read the story without leaving**
-- **Light and dark mode**
-- **Responsive — built for phones as well as desktop**
 - **Persistent article archive**
 - **Feedback and source suggestions**
 - **Clean, minimal interface**
-
----
-
-## Tech Stack
-
-### Frontend
-
-- HTML
-- CSS
-- JavaScript
-
-### Backend
-
-- Python
-- Flask
-
-### Database
-
-- Supabase
-- PostgreSQL
-
-### Data
-
-- RSS feeds
-- Web sources
-- Custom filtering and classification
-- Duplicate detection
-
-### AI
-
-- Google Gemini (free tier)
 
 ---
 
@@ -136,6 +107,38 @@ In these cases, the article remains available with its original description inst
 A summarization failure never prevents an article from appearing on SIGNAL.
 
 The site also functions normally without a `GEMINI_API_KEY`; articles simply display their original descriptions when a summary is unavailable.
+
+---
+
+## Tech Stack
+
+### Frontend
+
+- HTML
+- CSS
+- JavaScript
+
+### Backend
+
+- Python
+- Flask
+
+### Database
+
+- Supabase
+- PostgreSQL
+
+### AI
+
+- Google Gemini
+
+### Data
+
+- RSS feeds
+- Web sources
+- Custom filtering and classification
+- Duplicate detection
+
 ---
 
 ## Project Structure
@@ -157,12 +160,12 @@ SIGNAL/
 │   ├── migrate_submissions.py
 │   ├── news.py
 │   ├── refresh.py
-│   ├── schema.sql
 │   ├── scrape.py
 │   ├── search.py
 │   ├── sources.py
 │   ├── submissions.py
 │   ├── summarize.py
+│   ├── schema.sql
 │   │
 │   ├── .env.example
 │   └── requirements.txt
@@ -199,7 +202,7 @@ Then create your environment file:
 cp .env.example .env
 ```
 
-Add your Supabase credentials to `.env`, plus a free [Google AI Studio](https://aistudio.google.com/apikey) key as `GEMINI_API_KEY` for summaries.
+Add your Supabase credentials and Gemini API key to `.env`.
 
 The `.env` file contains private credentials and must never be committed to Git.
 
@@ -212,30 +215,6 @@ python dev.py
 ```
 
 Open the local address shown in the terminal.
-
-`dev.py` starts the backend and the frontend together, and Ctrl+C stops both.
-
-### 4. Keep the feed fresh
-
-```bash
-python refresh.py
-```
-
-This ingests from every source and summarises whatever is new.
-
-Put it on a schedule to keep SIGNAL current:
-
-```text
-*/10 * * * *  cd /path/to/backend && python refresh.py
-```
-
-Summaries can also be written on their own:
-
-```bash
-python summarize.py              # everything outstanding
-python summarize.py 20           # at most twenty
-python summarize.py --retry-thin # try unreadable pages again
-```
 
 ---
 
