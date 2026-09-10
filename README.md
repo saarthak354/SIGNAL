@@ -16,7 +16,13 @@ New models, research papers, product launches, funding announcements, partnershi
 
 SIGNAL brings that information into one place.
 
-The platform is organized around two primary sources of information:
+The platform is organized around three primary views:
+
+### Home
+
+Home brings everything together.
+
+Company updates and discovery articles are combined into a single chronological feed, with the latest developments appearing first.
 
 ### Companies
 
@@ -40,19 +46,7 @@ Each company has its own dedicated view containing its latest articles.
 
 Explore AI news from the wider internet.
 
-Discovery surfaces articles and discussions from external sources and communities, allowing users to discover developments that may not originate directly from an AI company.
-
----
-
-## Home
-
-The Home feed brings everything together.
-
-Company updates and discovery articles are combined into a single chronological feed, with the latest developments appearing first.
-
-The goal is simple:
-
-**Open SIGNAL and see what is happening in AI right now.**
+Discovery surfaces articles and discussions from external publishers and communities, allowing users to discover developments that may not originate directly from an AI company.
 
 ---
 
@@ -70,13 +64,39 @@ The goal is simple:
 - **Article filtering and classification**
 - **RSS and web-based ingestion**
 - **Persistent article archive**
+- **Feedback and source suggestions**
 - **Clean, minimal interface**
 
 ---
 
-## Architecture
+## Tech Stack
 
-SIGNAL is split into two primary layers:
+### Frontend
+
+- HTML
+- CSS
+- JavaScript
+
+### Backend
+
+- Python
+- Flask
+
+### Database
+
+- Supabase
+- PostgreSQL
+
+### Data
+
+- RSS feeds
+- Web sources
+- Custom filtering and classification
+- Duplicate detection
+
+---
+
+## Project Structure
 
 ```text
 SIGNAL/
@@ -105,7 +125,6 @@ SIGNAL/
 │
 ├── frontend/
 │   ├── logos/
-│   │
 │   ├── app.js
 │   ├── index.html
 │   └── style.css
@@ -117,75 +136,30 @@ SIGNAL/
 
 ---
 
-## Database
+## Running Locally
 
-SIGNAL stores its articles in Postgres, on Supabase.
-
-Ingestion and serving are separate jobs. Ingestion goes out to the sources, filters what it finds, and writes it to the store. A page load only ever reads the store back.
-
-```text
-sources ──▶ ingest ──▶ Postgres ──▶ API ──▶ frontend
-            (on a schedule)        (per request)
-```
-
-That separation is what makes the archive an archive. Before it, everything lived in memory for ten minutes at a time: a restart lost the lot, and any story a feed stopped carrying disappeared from the site with it. Now a source going quiet, going slow, or going down costs nothing at read time.
-
-### Tables
-
-| Table | Holds |
-| --- | --- |
-| `articles` | Every article ever ingested, identified by its canonical URL |
-| `ingest_runs` | What each run saw, and which sources failed |
-| `submissions` | Feedback and source suggestions from the footer forms |
-
-### One story, one row
-
-Duplicates were already dropped inside a single ingest. The store extends that across runs: a new article is checked against everything already held, using the same rules.
-
-It also lets a stored story be replaced. A newsroom writing up a launch is often stored hours before the company's own post arrives, and turning that post away as a duplicate would keep it off the company's own page. So when a better source turns up with the same story, it takes the place of the one already there:
-
-```text
-company  ▶  publisher  ▶  aggregator
-```
-
----
-
-## Running locally
-
-### 1. Install
+### 1. Install dependencies
 
 ```bash
 cd backend
 pip install -r requirements.txt
 ```
 
-### 2. Create the tables
+### 2. Configure Supabase
 
-In the Supabase dashboard for the SIGNAL project, open the SQL Editor and run `backend/schema.sql`. It is safe to re-run.
+Create the database using `backend/schema.sql` in the Supabase SQL Editor.
 
-### 3. Point the backend at the project
+Then create your environment file:
 
 ```bash
 cp .env.example .env
 ```
 
-Fill in `SUPABASE_URL` and `SUPABASE_SERVICE_KEY` from **Settings → API**.
+Add your Supabase credentials to `.env`.
 
-The service role key bypasses row level security, so it belongs on the server only. `.env` is gitignored, and the key must never reach the frontend or a commit.
+The `.env` file contains private credentials and must never be committed to Git.
 
-### 4. Fill the store
-
-```bash
-python refresh.py
-```
-
-This is the only part that talks to the feeds, which makes it the thing to put on a schedule:
-
-```text
-*/10 * * * *  cd /path/to/backend && python refresh.py
-```
-
-### 5. Run it
+### 3. Start SIGNAL
 
 From the project root:
 
@@ -193,38 +167,10 @@ From the project root:
 python dev.py
 ```
 
-That starts both halves and streams their output into one terminal, each line labelled with the server it came from:
+Open the local address shown in the terminal.
 
-```text
-[dev]      backend on http://127.0.0.1:5050
-[dev]      frontend on http://127.0.0.1:5500
-[dev]      open http://127.0.0.1:5500
-[dev]      Ctrl+C stops both
-```
+---
 
-Open **http://127.0.0.1:5500**. Ctrl+C stops both servers.
+## License
 
-`dev.py` only starts things. The two halves stay exactly as they are — the API on 5050, the site on 5500, talking over CORS — and it changes nothing about how either behaves. It checks both ports first, because half a stack coming up is more confusing than none of it, and if one server exits on its own it stops the other rather than leaving a half-running app.
-
-To start them by hand instead, in two terminals:
-
-```bash
-cd backend   && python main.py                    # the API
-cd frontend  && python3 -m http.server 5500       # the site
-```
-
-`GET /api/health` reports whether the store is reachable and what the last ingest did, without triggering one.
-
-### Moving the old submissions across
-
-Submissions used to be appended to `data/submissions.jsonl`. To move anything that collected there into the table:
-
-```bash
-python migrate_submissions.py
-```
-
-It can be run twice without duplicating anything, and it leaves the file where it is.
-
-### Without a database
-
-If `SUPABASE_URL` and `SUPABASE_SERVICE_KEY` are unset, or the store cannot be reached, the site does not go dark. It falls back to what it did before: ingesting into memory and serving that. Everything works except the part the store exists for, which is remembering anything beyond what the feeds are carrying right now.
+This project is currently for personal development and experimentation.
