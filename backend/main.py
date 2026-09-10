@@ -1,9 +1,12 @@
+from datetime import datetime, timezone
+
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 
 from ingest import get_articles, select, paginate
 from sources import companies
 from submissions import validate, save
+from homepage import score_breakdown
 
 
 app = Flask(__name__)
@@ -21,6 +24,7 @@ CORS(app)
 #   /api/articles?q=gpt-5          search everything
 #   /api/articles?limit=15         cap the feed
 #   /api/articles?offset=15        skip the first page
+#   /api/articles?explain=1        show the ranking maths
 
 MAX_LIMIT = 200
 
@@ -79,7 +83,7 @@ def articles():
         offset
     )
 
-    return jsonify({
+    payload = {
         "total_ingested": cache["ingested"],
 
         # How many matched before the cap, so the
@@ -97,7 +101,25 @@ def articles():
         "errors": cache["errors"],
 
         "articles": shown
-    })
+    }
+
+    # The point of ranking by rules rather than by
+    # model is that there is always an answer to
+    # why something is on the front page. This is
+    # that answer, on request.
+    if request.args.get("explain"):
+
+        now = datetime.now(timezone.utc)
+
+        payload["ranking"] = [
+            {
+                "title": article.get("title"),
+                **score_breakdown(article, now)
+            }
+            for article in shown
+        ]
+
+    return jsonify(payload)
 
 
 # -----------------------------------

@@ -9,6 +9,7 @@ from filters import filter_articles, HOME_WINDOW_DAYS, RETENTION_DAYS
 from sources import all_sources
 from classify import detect_company, company_from_url
 from search import search
+from homepage import curate
 
 
 # -----------------------------------
@@ -90,6 +91,16 @@ def tag(article, source):
 
         article["related_company"] = related_name
         article["related_company_id"] = related_id
+
+    # What kind of source this is, which is what
+    # the homepage ranking weighs: a company's own
+    # announcement, a newsroom reporting on it, or
+    # a link somebody upvoted.
+    article["source_tier"] = (
+        "company" if is_company
+        else "aggregator" if source.get("aggregator")
+        else "publisher"
+    )
 
     # Used by the relevance filter, then dropped
     article["trusted"] = source.get("trusted", False)
@@ -247,16 +258,29 @@ def select(articles, tab=None, company_id=None, query=None):
             if a.get("company_id") == company_id
         ]
 
+    # Companies and Discovery are archives. They
+    # answer "what has this company published" and
+    # "what is the field talking about", so they
+    # show everything they hold, newest first.
     if tab == "companies":
-        pool = [a for a in articles if a["category"] == "company"]
 
-    elif tab == "discovery":
-        pool = [a for a in articles if a["category"] == "discovery"]
+        return within_home_window(
+            [a for a in articles if a["category"] == "company"]
+        )
 
-    else:
-        pool = articles
+    if tab == "discovery":
 
-    return within_home_window(pool)
+        return within_home_window(
+            [a for a in articles if a["category"] == "discovery"]
+        )
+
+    # Home answers a different question — what
+    # matters right now — so it is chosen rather
+    # than listed. Nothing is lost by being left
+    # off it; every article is still on its own tab.
+    return curate(
+        within_home_window(articles)
+    )
 
 
 # -----------------------------------

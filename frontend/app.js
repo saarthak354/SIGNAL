@@ -8,6 +8,11 @@ const ARTICLES_PER_PAGE = 15;
 // a longer page than a feed you only scroll.
 const SEARCH_RESULTS_PER_PAGE = 30;
 
+// Home is a front page, not a feed. Six is what
+// the editorial grid below is built around: one
+// lead, two beside it, three underneath.
+const HOME_ARTICLES_PER_PAGE = 6;
+
 const newsFeed = document.getElementById("news-feed");
 const companyList = document.getElementById("company-list");
 const currentDate = document.getElementById("current-date");
@@ -418,9 +423,17 @@ window.addEventListener("hashchange", applyRoute);
 
 function pageSize() {
 
-    return state.tab === "search"
-        ? SEARCH_RESULTS_PER_PAGE
-        : ARTICLES_PER_PAGE;
+    if (state.tab === "search") {
+        return SEARCH_RESULTS_PER_PAGE;
+    }
+
+    // A company's own page is an archive even
+    // though it has no tab of its own
+    if (state.tab === "home" && !state.companyId) {
+        return HOME_ARTICLES_PER_PAGE;
+    }
+
+    return ARTICLES_PER_PAGE;
 }
 
 
@@ -648,11 +661,17 @@ function displayPager(total, shown) {
     pager.appendChild(count);
 
 
+    // Home is six stories and an invitation. The
+    // archives are lists you page through.
+    const nextLabel = state.tab === "home" && !state.companyId
+        ? "Continue reading \u2192"
+        : "Load next \u2192";
+
     pager.appendChild(
         hasNext
             ? pagerLink(
                 withPage(base, state.page + 1),
-                "Load next \u2192"
+                nextLabel
             )
             : pagerGap()
     );
@@ -749,10 +768,196 @@ function displayCompanies(companies) {
 
 
 // -----------------------------------
+// THE EDITORIAL GRID
+// -----------------------------------
+//
+// Home is not a list. Six stories run as a front
+// page would set them: the lead takes two columns
+// and the full height beside it, two more stack
+// down the right, and three sit along the bottom.
+//
+//     ┌───────────────┬───────┐
+//     │               │   2   │
+//     │       1       ├───────┤
+//     │               │   3   │
+//     ├───────┬───────┼───────┤
+//     │   4   │   5   │   6   │
+//     └───────┴───────┴───────┘
+//
+// Only the lead is placed by hand. Everything
+// after it falls into the gaps the grid leaves,
+// so a short last page still lands correctly.
+
+const EDITORIAL_ROLES = [
+    "news-item--lead",
+    "news-item--side",
+    "news-item--side"
+];
+
+const EDITORIAL_DEFAULT_ROLE = "news-item--base";
+
+
+function editorialRole(index) {
+
+    return EDITORIAL_ROLES[index] || EDITORIAL_DEFAULT_ROLE;
+}
+
+
+// -----------------------------------
+// ONE ARTICLE CARD
+// -----------------------------------
+
+function createArticle(article, position) {
+
+    const articleElement = document.createElement("article");
+
+    articleElement.classList.add("news-item");
+
+
+    // -----------------------------------
+    // META
+    // -----------------------------------
+
+    const meta = document.createElement("div");
+
+    meta.classList.add("article-meta");
+
+
+    // A running number, so the page reads in an
+    // order rather than as six equal things
+    if (position !== null) {
+
+        const index = document.createElement("span");
+
+        index.classList.add("article-index");
+
+        index.textContent =
+            String(position + 1).padStart(2, "0");
+
+        meta.appendChild(index);
+    }
+
+
+    const source = document.createElement("span");
+
+    source.classList.add("article-source");
+
+    source.textContent = (article.source || "").toUpperCase();
+
+
+    const time = document.createElement("span");
+
+    time.classList.add("article-time");
+
+    time.textContent = formatTime(article.published);
+
+
+    meta.appendChild(source);
+    meta.appendChild(time);
+
+
+    // -----------------------------------
+    // TITLE
+    // -----------------------------------
+
+    const title = document.createElement("h2");
+
+    title.textContent = article.title;
+
+
+    // -----------------------------------
+    // DESCRIPTION
+    // -----------------------------------
+
+    const description = document.createElement("p");
+
+    description.textContent = cleanDescription(article.description);
+
+
+    // -----------------------------------
+    // CATEGORY
+    // -----------------------------------
+
+    // On a company page the source line already
+    // names the company, so only add a chip when
+    // it says something the card does not.
+
+    const category = document.createElement("div");
+
+    category.classList.add("article-category");
+
+    const via = article.via || "";
+
+    if (article.category === "discovery") {
+
+        // The meta line names the exact site this
+        // came from; this names who it is about.
+        // Both are kept even when they agree, which
+        // happens when an aggregator links straight
+        // to a company's own blog.
+        category.textContent = article.related_company
+            ? article.related_company
+            : `Via ${via}`;
+
+        if (category.textContent === `Via ${source.textContent}`) {
+            category.textContent = "";
+        }
+    }
+    else {
+
+        category.textContent = article.company || "";
+
+        // On a company card this only ever repeats
+        // the source line
+        if (category.textContent.toUpperCase() === source.textContent) {
+            category.textContent = "";
+        }
+    }
+
+
+    articleElement.appendChild(meta);
+    articleElement.appendChild(title);
+
+    if (description.textContent) {
+        articleElement.appendChild(description);
+    }
+
+    if (category.textContent) {
+        articleElement.appendChild(category);
+    }
+
+
+    // -----------------------------------
+    // CLICK ARTICLE
+    // -----------------------------------
+
+    articleElement.addEventListener("click", () => {
+
+        window.open(
+            article.url,
+            "_blank"
+        );
+
+    });
+
+
+    return articleElement;
+}
+
+
+// -----------------------------------
 // DISPLAY ARTICLES
 // -----------------------------------
 
 function displayArticles(articles, emptyMessage) {
+
+    // Home gets the grid. The archives stay a
+    // single column, because a list of everything
+    // one company published is a list.
+    const editorial =
+        state.tab === "home" && !state.companyId;
+
+    newsFeed.classList.toggle("news-feed--editorial", editorial);
 
     newsFeed.innerHTML = "";
 
@@ -770,122 +975,22 @@ function displayArticles(articles, emptyMessage) {
         return;
     }
 
-    articles.forEach(article => {
+    // The numbering carries on across pages, so
+    // page two opens at 07 rather than at 01
+    const firstPosition = (state.page - 1) * pageSize();
 
-        const articleElement = document.createElement("article");
+    articles.forEach((article, index) => {
 
-        articleElement.classList.add("news-item");
+        const card = createArticle(
+            article,
+            editorial ? firstPosition + index : null
+        );
 
-
-        // -----------------------------------
-        // META
-        // -----------------------------------
-
-        const meta = document.createElement("div");
-
-        meta.classList.add("article-meta");
-
-
-        const source = document.createElement("span");
-
-        source.textContent = (article.source || "").toUpperCase();
-
-
-        const time = document.createElement("span");
-
-        time.textContent = formatTime(article.published);
-
-
-        meta.appendChild(source);
-        meta.appendChild(time);
-
-
-        // -----------------------------------
-        // TITLE
-        // -----------------------------------
-
-        const title = document.createElement("h2");
-
-        title.textContent = article.title;
-
-
-        // -----------------------------------
-        // DESCRIPTION
-        // -----------------------------------
-
-        const description = document.createElement("p");
-
-        description.textContent = cleanDescription(article.description);
-
-
-        // -----------------------------------
-        // CATEGORY
-        // -----------------------------------
-
-        // On a company page the source line already
-        // names the company, so only add a chip when
-        // it says something the card does not.
-
-        const category = document.createElement("div");
-
-        category.classList.add("article-category");
-
-        const via = article.via || "";
-
-        if (article.category === "discovery") {
-
-            // The meta line names the exact site this
-            // came from; this names who it is about.
-            // Both are kept even when they agree, which
-            // happens when an aggregator links straight
-            // to a company's own blog.
-            category.textContent = article.related_company
-                ? article.related_company
-                : `Via ${via}`;
-
-            if (category.textContent === `Via ${source.textContent}`) {
-                category.textContent = "";
-            }
-        }
-        else {
-
-            category.textContent = article.company || "";
-
-            // On a company card this only ever repeats
-            // the source line
-            if (category.textContent.toUpperCase() === source.textContent) {
-                category.textContent = "";
-            }
+        if (editorial) {
+            card.classList.add(editorialRole(index));
         }
 
-
-        articleElement.appendChild(meta);
-        articleElement.appendChild(title);
-
-        if (description.textContent) {
-            articleElement.appendChild(description);
-        }
-
-        if (category.textContent) {
-            articleElement.appendChild(category);
-        }
-
-
-        // -----------------------------------
-        // CLICK ARTICLE
-        // -----------------------------------
-
-        articleElement.addEventListener("click", () => {
-
-            window.open(
-                article.url,
-                "_blank"
-            );
-
-        });
-
-
-        newsFeed.appendChild(articleElement);
+        newsFeed.appendChild(card);
 
     });
 
