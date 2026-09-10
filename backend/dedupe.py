@@ -356,9 +356,19 @@ class Deduper:
 
     def __init__(self):
 
-        self._urls = set()
+        # url key -> index, so a story reached by
+        # its link can be traced back to whatever
+        # was filed under it
+        self._urls = {}
 
         self._stories = []
+
+        # Whatever the caller wants to get back
+        # when a story matches. Within one ingest
+        # nothing reads it; the store uses it to
+        # recover the row a new article collides
+        # with.
+        self._payloads = []
 
         self._by_word = defaultdict(list)
 
@@ -380,18 +390,16 @@ class Deduper:
         return seen
 
 
-    def add(self, article, published=None):
+    def match(self, article, published=None):
         """
-        Record an article, unless we already hold
-        this story. Returns True when it is new.
+        The index of the story this article
+        duplicates, or None when it is new.
         """
 
         url = canonical_url(article.get("url"))
 
         if url and url in self._urls:
-
-            self.duplicates += 1
-            return False
+            return self._urls[url]
 
         words = fingerprint(article.get("title"))
 
@@ -405,17 +413,56 @@ class Deduper:
             if not close_in_time(published, other_date):
                 continue
 
-            self.duplicates += 1
-            return False
+            return index
 
-        if url:
-            self._urls.add(url)
+        return None
+
+
+    def record(self, title, published=None, url=None, payload=None):
+        """
+        File a story we hold, without asking
+        whether we already hold it. Used to seed
+        the set from what is already stored.
+        """
+
+        words = fingerprint(title)
 
         index = len(self._stories)
 
         self._stories.append((words, published))
 
+        self._payloads.append(payload)
+
+        if url:
+            self._urls[url] = index
+
         for word in words:
             self._by_word[word].append(index)
+
+        return index
+
+
+    def payload(self, index):
+
+        return self._payloads[index]
+
+
+    def add(self, article, published=None):
+        """
+        Record an article, unless we already hold
+        this story. Returns True when it is new.
+        """
+
+        if self.match(article, published) is not None:
+
+            self.duplicates += 1
+            return False
+
+        self.record(
+            article.get("title"),
+            published,
+            canonical_url(article.get("url")),
+            article
+        )
 
         return True

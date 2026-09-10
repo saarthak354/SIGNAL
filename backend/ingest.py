@@ -2,6 +2,9 @@ import threading
 import time
 
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timezone
+
+import db
 
 from news import fetch_rss_sources
 from scrape import scrape_website
@@ -16,17 +19,29 @@ from homepage import curate
 # CACHE
 # -----------------------------------
 #
-# Ingesting means nine network round trips
-# and a few thousand entries, which is far
-# too slow to redo on every page load.
+# Two clocks, because there are now two jobs
+# and they run at different speeds.
+#
+# Going out to the sources means nine network
+# round trips and a few thousand entries, so it
+# happens rarely and writes what it finds to the
+# store. Reading the store back is one query, so
+# it happens often and is all a page load needs.
+#
+# The practical difference: a slow or broken
+# source no longer holds up a request, because
+# no request is waiting on one.
 
-CACHE_SECONDS = 600
+INGEST_SECONDS = 600
+
+CACHE_SECONDS = 60
 
 _cache = {
     "articles": [],
     "ingested": 0,
     "errors": [],
-    "fetched_at": 0,
+    "loaded_at": 0,
+    "ingested_at": 0,
 }
 
 _lock = threading.Lock()
@@ -150,10 +165,14 @@ def fetch_source(source):
 
 
 # -----------------------------------
-# INGEST EVERYTHING
+# GO OUT AND FETCH
 # -----------------------------------
+#
+# Every source, filtered down to what belongs on
+# the site. Knows nothing about where the result
+# is going to be kept.
 
-def ingest():
+def collect():
 
     sources = all_sources()
 
@@ -206,8 +225,108 @@ def ingest():
         "articles": [clean(a) for a in filtered],
         "ingested": ingested,
         "errors": errors,
-        "fetched_at": time.time(),
     }
+
+
+# -----------------------------------
+# WITHOUT THE STORE
+# -----------------------------------
+#
+# The site should not go dark because the
+# database is unreachable or unconfigured. It
+# falls back to what it always used to do: hold
+# this run in memory and serve that.
+#
+# Everything still works except the part the
+# store exists for, which is remembering
+# anything beyond what the feeds are carrying
+# right now.
+
+def serve_from_memory(collected, reason=None):
+
+    if reason:
+        print(f"Serving from memory: {reason}")
+
+    _cache.update({
+        "articles": collected["articles"],
+        "ingested": collected["ingested"],
+        "errors": collected["errors"],
+        "loaded_at": time.time(),
+    })
+
+
+# -----------------------------------
+# FETCH, THEN STORE
+# -----------------------------------
+
+def refresh():
+
+    started_at = datetime.now(timezone.utc).isoformat()
+
+    collected = collect()
+
+    _cache["ingested_at"] = time.time()
+
+    if not db.configured():
+
+        serve_from_memory(
+            collected,
+            "SUPABASE_URL and SUPABASE_SERVICE_KEY are not set"
+        )
+
+        return
+
+    try:
+
+        counts = db.sync_articles(collected["articles"])
+
+        counts["ingested"] = collected["ingested"]
+
+        db.record_run(
+            counts,
+            collected["errors"],
+            started_at
+        )
+
+        print(
+            f"Ingest: {counts['ingested']} entries, "
+            f"{counts['kept']} kept, "
+            f"{counts['inserted']} new, "
+            f"{counts['replaced']} replaced"
+        )
+
+        # There is something new to read
+        _cache["loaded_at"] = 0
+
+    except Exception as error:
+
+        serve_from_memory(
+            collected,
+            f"{type(error).__name__}: {error}"
+        )
+
+
+# -----------------------------------
+# READ THE STORE
+# -----------------------------------
+
+def reload():
+
+    articles = db.load_articles()
+
+    run = db.latest_run() or {}
+
+    _cache.update({
+        "articles": articles,
+
+        # What the last ingest saw, rather than
+        # what this request saw, because this
+        # request did not fetch anything
+        "ingested": run.get("ingested", len(articles)),
+        "errors": run.get("errors") or [],
+
+        "loaded_at": time.time(),
+    })
 
 
 # -----------------------------------
@@ -218,11 +337,27 @@ def get_articles(force=False):
 
     with _lock:
 
-        age = time.time() - _cache["fetched_at"]
+        now = time.time()
 
-        if force or age > CACHE_SECONDS or not _cache["articles"]:
+        if force or now - _cache["ingested_at"] > INGEST_SECONDS:
+            refresh()
 
-            _cache.update(ingest())
+        if not db.configured():
+            return _cache
+
+        stale = time.time() - _cache["loaded_at"] > CACHE_SECONDS
+
+        if force or stale or not _cache["articles"]:
+
+            try:
+                reload()
+
+            except Exception as error:
+
+                print(
+                    f"Could not read the store: "
+                    f"{type(error).__name__}: {error}"
+                )
 
         return _cache
 

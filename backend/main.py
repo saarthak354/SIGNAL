@@ -3,6 +3,8 @@ from datetime import datetime, timezone
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 
+import db
+
 from ingest import get_articles, select, paginate
 from sources import companies
 from submissions import validate, save
@@ -184,6 +186,61 @@ def submit():
     save(entry)
 
     return jsonify({"ok": True})
+
+
+# -----------------------------------
+# HEALTH
+# -----------------------------------
+#
+# Whether the store is reachable and when it was
+# last filled, without loading the site to find
+# out. Deliberately does not trigger an ingest:
+# the point is to report the state, not change
+# it.
+
+@app.route("/api/health")
+def health():
+
+    if not db.configured():
+
+        return jsonify({
+            "database": "unconfigured",
+            "detail": (
+                "SUPABASE_URL and SUPABASE_SERVICE_KEY are not set. "
+                "The feed is being served from memory."
+            )
+        }), 503
+
+    try:
+        run = db.latest_run()
+
+    except Exception as error:
+
+        return jsonify({
+            "database": "unreachable",
+            "detail": f"{type(error).__name__}: {error}"
+        }), 503
+
+    if not run:
+
+        return jsonify({
+            "database": "empty",
+            "detail": "Connected, but nothing has been ingested yet. Run: python refresh.py"
+        })
+
+    return jsonify({
+        "database": "ok",
+        "last_ingest": {
+            "started_at": run["started_at"],
+            "finished_at": run["finished_at"],
+            "ingested": run["ingested"],
+            "kept": run["kept"],
+            "inserted": run["inserted"],
+            "refreshed": run["refreshed"],
+            "replaced": run["replaced"],
+            "errors": run.get("errors") or [],
+        }
+    })
 
 
 # -----------------------------------

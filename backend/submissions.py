@@ -4,15 +4,23 @@ import threading
 
 from datetime import datetime, timezone
 
+import db
+
 
 # -----------------------------------
 # WHERE SUBMISSIONS GO
 # -----------------------------------
 #
-# One JSON object per line. Append only, so a
-# crash can never take the earlier entries with
-# it, and it moves into the database as rows
-# whenever that gets built.
+# Into the database, as rows.
+#
+# The file underneath is what they used to be:
+# one JSON object per line, append only. It is
+# kept as the place a submission lands when the
+# database cannot take it, because somebody took
+# the trouble to write to us and a failed insert
+# is not a good enough reason to lose it. Run
+# migrate_submissions.py to move anything that
+# collected there into the table.
 
 DATA_DIR = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
@@ -75,6 +83,26 @@ def validate(payload):
 # -----------------------------------
 
 def save(entry):
+
+    if db.configured():
+
+        try:
+            return db.save_submission(entry)
+
+        except Exception as error:
+
+            print(
+                f"Submission could not be stored, "
+                f"falling back to the file: "
+                f"{type(error).__name__}: {error}"
+            )
+
+    append(entry)
+
+    return entry
+
+
+def append(entry):
 
     os.makedirs(DATA_DIR, exist_ok=True)
 
