@@ -1,0 +1,79 @@
+# -----------------------------------
+# KEEP THE FEED CURRENT
+# -----------------------------------
+#
+# Ingests every source and summarises whatever is
+# new. This is the job that closes the gap left by
+# the server's own background refresh, which
+# collects and stores articles but does not
+# summarise them -- without this, the first person
+# to open a new article waits while it is written.
+#
+# It runs here rather than on the web host for two
+# reasons: Render's scheduled jobs are paid, and
+# this work wants a few minutes and a network
+# connection, not a web server. It also means the
+# feed stays current even when the free API
+# instance is asleep.
+
+name: Refresh SIGNAL
+
+on:
+  schedule:
+    # Every fifteen minutes. GitHub's scheduler is
+    # best effort and runs late under load, which
+    # is fine: nothing here is time critical and
+    # every run is idempotent.
+    - cron: "*/15 * * * *"
+
+  # So it can be run by hand from the Actions tab
+  workflow_dispatch:
+
+# A slow run must not overlap the next one and
+# summarise the same articles twice
+concurrency:
+  group: refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install
+        run: pip install -r backend/requirements.txt
+
+      - name: Ingest and summarise
+        working-directory: backend
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python refresh.py
+
+      # Free Render instances sleep after fifteen
+      # minutes idle and take the better part of a
+      # minute to wake. This lands just often
+      # enough to keep it awake, and the whole
+      # month fits inside the free instance hours.
+      #
+      # Harmless if API_URL is unset: the step is
+      # skipped rather than failing the run.
+      - name: Keep the API awake
+        if: ${{ vars.API_URL != '' }}
+        continue-on-error: true
+        # Block scalar: the -w format string
+        # contains a colon, which YAML would
+        # otherwise read as a mapping
+        run: |
+          curl -sS -m 60 "${{ vars.API_URL }}/api/health" \
+            -o /dev/null -w "health %{http_code} in %{time_total}s\n"

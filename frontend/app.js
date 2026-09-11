@@ -1,4 +1,20 @@
-const API = "http://127.0.0.1:5050";
+// -----------------------------------
+// WHERE THE API LIVES
+// -----------------------------------
+//
+// The frontend is static files and the API is a
+// separate service, so the address has to come
+// from somewhere.
+//
+// index.html sets window.SIGNAL_API for the
+// deployed site. Without it -- opening the page
+// on a laptop, or straight off disk -- it falls
+// back to the local backend, so development
+// needs no configuration and no build step.
+
+const LOCAL_API = "http://127.0.0.1:5050";
+
+const API = (window.SIGNAL_API || "").trim() || LOCAL_API;
 
 // How many articles a single view shows. Keeps
 // every page short enough to reach the footer.

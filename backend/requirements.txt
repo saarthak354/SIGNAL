@@ -6,3 +6,8 @@ beautifulsoup4>=4.12
 python-dotenv>=1.0
 supabase>=2.4
 google-genai>=1.0
+
+# Production WSGI server. Flask's own server is
+# single-purpose development tooling and says so
+# on startup.
+gunicorn>=21.2

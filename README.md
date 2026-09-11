@@ -218,6 +218,44 @@ Open the local address shown in the terminal.
 
 ---
 
+## Deployment
+
+SIGNAL runs as three separate pieces.
+
+| Piece | Where | Cost |
+| --- | --- | --- |
+| Static frontend | Render static site | free |
+| Flask API | Render web service | free |
+| Ingest + summarise | GitHub Actions, every 15 min | free |
+| Postgres | Supabase | free |
+
+`render.yaml` defines both Render services. Point Render at the repo as a Blueprint and it creates them.
+
+### Secrets
+
+Set these in the Render dashboard for the API service:
+
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_KEY`
+- `GEMINI_API_KEY`
+- `ALLOWED_ORIGINS` — the frontend's URL
+
+Set the same three as repository secrets in GitHub, under Settings → Secrets and variables → Actions, so the scheduled job can run.
+
+### Pointing the site at the API
+
+`frontend/index.html` sets `window.SIGNAL_API`. Leave it empty for local development and it falls back to `http://127.0.0.1:5050`.
+
+### Scheduled work
+
+`.github/workflows/refresh.yml` runs `refresh.py` every 15 minutes.
+
+This matters because the server's own background refresh collects and stores articles but does not summarise them. Without the scheduled job, new articles are summarised on first click instead, and that reader waits a few seconds.
+
+The same job optionally pings the API to keep the free instance awake. Set an `API_URL` repository variable to enable it.
+
+---
+
 ## License
 
 This project is currently for personal development and experimentation.

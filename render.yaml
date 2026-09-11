@@ -1,0 +1,96 @@
+# -----------------------------------
+# SIGNAL ON RENDER
+# -----------------------------------
+#
+# Two services from one file. Point Render at
+# this repo as a Blueprint and it creates both.
+#
+#   signal-api   the Flask API
+#   signal       the static frontend
+#
+# Ingestion is not here. It runs on a schedule in
+# GitHub Actions (.github/workflows/refresh.yml),
+# because Render's scheduled jobs are a paid
+# feature and the work only needs a network and a
+# few minutes -- it does not need this server.
+
+services:
+
+  # -----------------------------------
+  # THE API
+  # -----------------------------------
+
+  - type: web
+    name: signal-api
+    runtime: python
+    plan: free
+    rootDir: backend
+
+    buildCommand: pip install -r requirements.txt
+
+    # One worker, several threads.
+    #
+    # Each worker keeps its own in-memory cache of
+    # the feed and its own background refresh, so
+    # two workers would hold two copies and go out
+    # to fifteen sources twice. Threads share one
+    # of each, and the work is almost entirely
+    # waiting on the network anyway.
+    #
+    # The long timeout is for the one slow path:
+    # opening an article the summariser has not
+    # reached yet writes the summary on the spot.
+    startCommand: >
+      gunicorn main:app
+      --bind 0.0.0.0:$PORT
+      --workers 1
+      --threads 8
+      --timeout 120
+      --access-logfile -
+
+    healthCheckPath: /api/health
+
+    envVars:
+      # Set these in the Render dashboard. sync:false
+      # means "do not read it from this file" --
+      # secrets never belong in the repo.
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+
+      # Which origins may call this API. Set it to
+      # the frontend's URL once Render has assigned
+      # one, e.g. https://signal.onrender.com
+      - key: ALLOWED_ORIGINS
+        sync: false
+
+      - key: PYTHON_VERSION
+        value: "3.12.9"
+
+
+  # -----------------------------------
+  # THE SITE
+  # -----------------------------------
+
+  - type: web
+    name: signal
+    runtime: static
+    rootDir: frontend
+    staticPublishPath: .
+
+    headers:
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+
+    routes:
+      # Hash routing, so every address is index.html
+      - type: rewrite
+        source: /*
+        destination: /index.html

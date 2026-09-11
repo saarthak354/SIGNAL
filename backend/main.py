@@ -1,3 +1,5 @@
+import os
+
 from datetime import datetime, timezone
 
 from flask import Flask, jsonify, request
@@ -13,7 +15,60 @@ from homepage import score_breakdown
 
 
 app = Flask(__name__)
-CORS(app)
+
+
+# -----------------------------------
+# WHO MAY CALL THIS
+# -----------------------------------
+#
+# The frontend is served from somewhere else --
+# a static host -- so every request it makes is
+# cross origin and CORS is what allows it.
+#
+# In development that was every origin, which is
+# fine on a laptop and wrong in public: this API
+# writes submissions and spends an API key, and
+# neither should be reachable from any page that
+# cares to ask.
+#
+# ALLOWED_ORIGINS is a comma separated list set
+# on the host. Left unset, it falls back to the
+# local frontend, so nothing has to change to
+# keep working on a laptop.
+
+LOCAL_ORIGINS = [
+    "http://127.0.0.1:5500",
+    "http://localhost:5500",
+
+    # Opening index.html straight off disk sends
+    # a null origin
+    "null",
+]
+
+
+def allowed_origins():
+
+    configured = os.environ.get("ALLOWED_ORIGINS", "").strip()
+
+    if not configured:
+        return LOCAL_ORIGINS
+
+    return [
+        origin.strip()
+        for origin in configured.split(",")
+        if origin.strip()
+    ]
+
+
+CORS(
+    app,
+    origins=allowed_origins(),
+
+    # The API is public data and carries no
+    # cookies or auth, so there is nothing for a
+    # credentialed request to leak
+    supports_credentials=False,
+)
 
 
 # -----------------------------------
@@ -326,6 +381,16 @@ def health():
 # RUN SERVER
 # -----------------------------------
 
+# In production a WSGI server imports "app" from
+# this file and this block never runs. It is only
+# how the site starts on a laptop.
+#
+# debug is read from the environment and off
+# unless asked for, because the Werkzeug debugger
+# is an interactive Python prompt: reachable from
+# the internet, it is remote code execution, not
+# a convenience.
+
 if __name__ == "__main__":
 
     # Not port 5000: on macOS the AirPlay Receiver
@@ -333,6 +398,7 @@ if __name__ == "__main__":
     # Flask from starting or answers the frontend
     # with a 403 on http://localhost:5000.
     app.run(
-        debug=True,
-        port=5050
+        host=os.environ.get("HOST", "127.0.0.1"),
+        port=int(os.environ.get("PORT", 5050)),
+        debug=os.environ.get("FLASK_DEBUG", "1") == "1",
     )
