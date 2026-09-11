@@ -217,6 +217,43 @@ if (window.matchMedia) {
 
 
 // -----------------------------------
+// STALE RESPONSES
+// -----------------------------------
+//
+// Every view loads over the network, and the
+// slowest of them -- opening an article that has
+// not been summarised yet -- can take several
+// seconds. Long enough to press Back first.
+//
+// The reply still arrives, and the code that
+// handles it writes into elements the whole page
+// shares: the headline, the feed, the date line.
+// So an article opened and abandoned would put
+// its own title where "AI. Without the noise."
+// belongs, and stay there until the next reload.
+//
+// Each navigation takes a number. Anything that
+// comes back holding an old one has been
+// overtaken, and is dropped rather than drawn.
+
+let navigation = 0;
+
+
+function beginNavigation() {
+
+    navigation += 1;
+
+    return navigation;
+}
+
+
+function current(token) {
+
+    return token === navigation;
+}
+
+
+// -----------------------------------
 // ROUTES
 // -----------------------------------
 //
@@ -579,6 +616,8 @@ function markActiveTab() {
 
 async function applyRoute() {
 
+    const token = beginNavigation();
+
     const route = parseRoute();
 
     // Where "Back" goes: the view being left,
@@ -599,6 +638,13 @@ async function applyRoute() {
     state.companyName = route.companyId
         ? await companyName(route.companyId)
         : null;
+
+    // The company lookup is a network call, so a
+    // second navigation can have happened while
+    // it was out
+    if (!current(token)) {
+        return;
+    }
 
     // Whatever the address says is what the box
     // says, so the back button and a pasted link
@@ -723,6 +769,8 @@ function countLine(total) {
 
 async function loadArticles() {
 
+    const token = navigation;
+
     companyList.hidden = true;
     articleView.hidden = true;
     newsFeed.hidden = false;
@@ -758,6 +806,10 @@ async function loadArticles() {
 
         doneLoading();
 
+        if (!current(token)) {
+            return;
+        }
+
         if (state.tab === "search") {
 
             // Before the cap, so the page can say how
@@ -785,6 +837,10 @@ async function loadArticles() {
         console.error("Error loading articles:", error);
 
         doneLoading();
+
+        if (!current(token)) {
+            return;
+        }
 
         hidePager();
 
@@ -923,6 +979,8 @@ function displayArticle(article) {
 
 async function loadArticle() {
 
+    const token = navigation;
+
     newsFeed.hidden = true;
     companyList.hidden = true;
     articleView.hidden = false;
@@ -946,6 +1004,10 @@ async function loadArticle() {
         );
 
         doneLoading();
+
+        if (!current(token)) {
+            return;
+        }
 
         if (response.status === 404) {
 
@@ -972,6 +1034,10 @@ async function loadArticle() {
 
         doneLoading();
 
+        if (!current(token)) {
+            return;
+        }
+
         headline.textContent = "";
 
         articleView.innerHTML = `
@@ -987,6 +1053,8 @@ async function loadArticle() {
 
 async function loadCompanies() {
 
+    const token = navigation;
+
     newsFeed.hidden = true;
     articleView.hidden = true;
     companyList.hidden = false;
@@ -1001,6 +1069,10 @@ async function loadCompanies() {
 
         doneLoading();
 
+        if (!current(token)) {
+            return;
+        }
+
         displayCompanies(companies);
 
     } catch (error) {
@@ -1008,6 +1080,10 @@ async function loadCompanies() {
         console.error("Error loading companies:", error);
 
         doneLoading();
+
+        if (!current(token)) {
+            return;
+        }
 
         companyList.innerHTML = `
             <p class="error">Unable to load companies.</p>
