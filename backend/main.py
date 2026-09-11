@@ -8,7 +8,7 @@ from flask_cors import CORS
 import db
 import summarize
 
-from ingest import get_articles, select, paginate
+from ingest import get_articles, select, paginate, cache_state
 from sources import companies
 from submissions import validate, save
 from homepage import score_breakdown
@@ -374,6 +374,11 @@ def health():
         # invisible from the outside, which is
         # exactly how it is hardest to debug.
         "allowed_origins": allowed_origins(),
+
+        # Whether the feed being served came from
+        # Postgres or from this process's own last
+        # ingest
+        "serving": cache_state(),
 
         "summaries": summaries,
         "summariser": summarize.MODEL if summarize.configured() else "unconfigured",

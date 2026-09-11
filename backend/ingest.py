@@ -42,6 +42,12 @@ _cache = {
     "errors": [],
     "loaded_at": 0,
     "ingested_at": 0,
+
+    # "store" or "memory". Which of the two the
+    # articles in hand actually came from, because
+    # falling back is silent by design and looks
+    # from outside exactly like working.
+    "source": "none",
 }
 
 _lock = threading.Lock()
@@ -250,15 +256,46 @@ def collect():
 # right now.
 
 def serve_from_memory(collected, reason=None):
+    """
+    Serve this process's own last ingest.
+
+    Only for a backend with no store behind it at
+    all. With a store configured this must not
+    happen, and the guard below is why: articles
+    held in memory have never been through the
+    database, so they have no id -- and an id is
+    how the frontend opens one. Swapping them in
+    silently leaves a feed that looks entirely
+    normal until every article you click reports
+    that it does not exist.
+
+    So when there is a store and it is merely
+    unreachable, the last good data is kept and
+    the failure is left visible instead.
+    """
+
+    if db.configured():
+
+        print(
+            f"Refresh failed and the store is configured, so the "
+            f"last good feed is being kept rather than replaced "
+            f"with un-openable articles: {reason}",
+            flush=True
+        )
+
+        _cache["last_refresh_error"] = reason
+
+        return
 
     if reason:
-        print(f"Serving from memory: {reason}")
+        print(f"Serving from memory: {reason}", flush=True)
 
     _cache.update({
         "articles": collected["articles"],
         "ingested": collected["ingested"],
         "errors": collected["errors"],
         "loaded_at": time.time(),
+        "source": "memory",
     })
 
 
@@ -333,6 +370,7 @@ def reload():
         "errors": run.get("errors") or [],
 
         "loaded_at": time.time(),
+        "source": "store",
     })
 
 
@@ -432,9 +470,14 @@ def get_articles(force=False):
 
             except Exception as error:
 
+                _cache["last_read_error"] = (
+                    f"{type(error).__name__}: {error}"
+                )
+
                 print(
                     f"Could not read the store: "
-                    f"{type(error).__name__}: {error}"
+                    f"{type(error).__name__}: {error}",
+                    flush=True
                 )
 
         return _cache
@@ -517,3 +560,14 @@ def paginate(articles, limit=None, offset=0):
         return articles
 
     return articles[:limit]
+
+
+def cache_state():
+    """Where the articles in hand came from."""
+
+    return {
+        "source": _cache.get("source"),
+        "articles": len(_cache.get("articles") or []),
+        "last_read_error": _cache.get("last_read_error"),
+        "last_refresh_error": _cache.get("last_refresh_error"),
+    }
