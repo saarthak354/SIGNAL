@@ -14,7 +14,36 @@
 
 const LOCAL_API = "http://127.0.0.1:5050";
 
-const API = (window.SIGNAL_API || "").trim() || LOCAL_API;
+
+// Where the page is being served from decides
+// which backend it talks to.
+//
+// Checking this rather than just reading
+// SIGNAL_API, because the deployed index.html
+// carries the production URL and that file is
+// the same one served by the local dev server.
+// Without this, running dev.py would quietly
+// talk to the live API -- and be refused by it,
+// since its CORS allowlist is the deployed site
+// and nothing else.
+//
+// The empty hostname is file://, which is what
+// opening index.html straight off disk gives.
+
+const LOCAL_HOSTS = ["127.0.0.1", "localhost", ""];
+
+
+function apiBase() {
+
+    if (LOCAL_HOSTS.includes(window.location.hostname)) {
+        return LOCAL_API;
+    }
+
+    return (window.SIGNAL_API || "").trim() || LOCAL_API;
+}
+
+
+const API = apiBase();
 
 // How many articles a single view shows. Keeps
 // every page short enough to reach the footer.
