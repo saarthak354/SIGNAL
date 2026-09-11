@@ -24,20 +24,53 @@ BOILERPLATE = {
 }
 
 
-def clean_description(value):
+# Some feeds escape their markup twice, so one
+# pass leaves "&amp;#8217;" as "&#8217;" -- still
+# an entity, just a less obvious one. Decoding
+# until it stops changing handles both, and a
+# bound keeps it from looping on pathological
+# input.
+
+def unescape_fully(text, rounds=3):
+
+    for _ in range(rounds):
+
+        decoded = html.unescape(text)
+
+        if decoded == text:
+            break
+
+        text = decoded
+
+    return text
+
+
+def clean_text(value):
+    """
+    Feed text, with its markup and entities taken
+    off. Used for titles as well as bodies --
+    titles are escaped exactly the same way, and
+    for a while only the bodies were being cleaned,
+    which is how a headline came to read
+    "Meta says it&#8217;s changing AI suggestions".
+    """
 
     if not value:
         return ""
 
     text = re.sub(r"<[^>]+>", " ", value)
 
-    # Feeds escape their markup, so stripping the
-    # tags leaves the entities behind: without this
-    # a card reads "OpenAI&#8217;s" and a summary is
-    # handed the same thing to work from.
-    text = html.unescape(text)
+    text = unescape_fully(text)
 
-    text = re.sub(r"\s+", " ", text).strip()
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def clean_description(value):
+
+    if not value:
+        return ""
+
+    text = clean_text(value)
 
     if text.lower().strip(" .") in BOILERPLATE:
         return ""
@@ -90,7 +123,7 @@ def feed_text(entry):
 
     text = re.sub(r"<[^>]+>", " ", text)
 
-    text = html.unescape(text)
+    text = unescape_fully(text)
 
     text = re.sub(r"\s+", " ", text).strip()
 
@@ -217,9 +250,8 @@ def fetch_rss_sources(sources):
 
                 news_item = {
 
-                    "title": article.get(
-                        "title",
-                        ""
+                    "title": clean_text(
+                        article.get("title", "")
                     ),
 
                     "url": article_url,
