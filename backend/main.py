@@ -367,6 +367,14 @@ def health():
 
     return jsonify({
         "database": "ok",
+
+        # Which origins this server will answer.
+        # Not a secret -- they are public URLs --
+        # and a silent CORS refusal is otherwise
+        # invisible from the outside, which is
+        # exactly how it is hardest to debug.
+        "allowed_origins": allowed_origins(),
+
         "summaries": summaries,
         "summariser": summarize.MODEL if summarize.configured() else "unconfigured",
         "last_ingest": {
