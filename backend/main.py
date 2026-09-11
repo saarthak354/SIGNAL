@@ -53,8 +53,13 @@ def allowed_origins():
     if not configured:
         return LOCAL_ORIGINS
 
+    # A browser's Origin header is scheme, host and
+    # port with nothing after it, so a value pasted
+    # with the trailing slash a URL bar shows will
+    # never match anything -- and fails as a silent
+    # CORS block with no hint as to why.
     return [
-        origin.strip()
+        origin.strip().rstrip("/")
         for origin in configured.split(",")
         if origin.strip()
     ]
