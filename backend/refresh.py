@@ -13,6 +13,7 @@ on a schedule:
     */10 * * * *  cd /path/to/backend && python refresh.py
 """
 
+import os
 import sys
 
 import db
@@ -21,14 +22,43 @@ import summarize
 from ingest import refresh
 
 
+def missing_settings_advice():
+    """
+    Where the missing values are meant to come
+    from, which depends on where this is running.
+    Telling a GitHub Actions run to copy
+    .env.example is advice it cannot follow.
+    """
+
+    if os.environ.get("GITHUB_ACTIONS") == "true":
+
+        return (
+            "This is running in GitHub Actions, where the values come "
+            "from repository secrets.\n"
+            "Add SUPABASE_URL, SUPABASE_SERVICE_KEY and GEMINI_API_KEY under "
+            "Settings -> Secrets and variables -> Actions -> "
+            "New repository secret."
+        )
+
+    return "Copy .env.example to .env and fill them in."
+
+
 def main():
 
     if not db.configured():
 
+        # Named individually, because "both are not
+        # set" hides which one was actually missed
+        missing = [
+            name for name in ("SUPABASE_URL", "SUPABASE_SERVICE_KEY")
+            if not os.environ.get(name, "").strip()
+        ]
+
         print(
-            "SUPABASE_URL and SUPABASE_SERVICE_KEY are not set, "
-            "so there is nowhere to write to.\n"
-            "Copy .env.example to .env and fill them in."
+            f"Missing: {', '.join(missing) or 'SUPABASE_URL / SUPABASE_SERVICE_KEY'} "
+            f"-- there is nowhere to write to.\n"
+            f"{missing_settings_advice()}",
+            flush=True
         )
 
         return 1
