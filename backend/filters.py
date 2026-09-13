@@ -384,6 +384,25 @@ def filter_articles(articles, window_days=RETENTION_DAYS):
         if not deduper.add(article, published):
             continue
 
+        # Nothing can have been published after
+        # the moment we read it. A source can still
+        # date an article a few hours ahead -- most
+        # often a date with no time on it, read as
+        # midnight UTC while it is still the day
+        # before in UTC. Stored as given, that date
+        # displayed as "-219m ago", and the homepage
+        # ranking read "in the future" as "zero hours
+        # old" and gave it full recency, pinning it
+        # to the top of the page.
+        #
+        # The window above still admits it -- the
+        # article is real -- it just cannot be newer
+        # than now.
+        now = datetime.now(timezone.utc)
+
+        if published > now:
+            published = now
+
         # Hand the frontend one consistent
         # date format regardless of source
         article["published"] = published.isoformat()

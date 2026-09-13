@@ -1538,8 +1538,15 @@ function formatTime(dateString) {
 
     const now = new Date();
 
-    const difference =
-        Math.floor((now - published) / 1000);
+    // Never negative. Ingestion clamps dates to
+    // the moment they were read, but a visitor's
+    // clock can still run ahead of the server's,
+    // and "-3m ago" is never the right thing to
+    // show someone.
+    const difference = Math.max(
+        0,
+        Math.floor((now - published) / 1000)
+    );
 
 
     const minutes =
@@ -1551,6 +1558,10 @@ function formatTime(dateString) {
     const days =
         Math.floor(hours / 24);
 
+
+    if (minutes < 1) {
+        return "just now";
+    }
 
     if (minutes < 60) {
         return `${minutes}m ago`;

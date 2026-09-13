@@ -1257,6 +1257,19 @@ main {
     color: var(--bar-ink-strong);
 }
 
+/* The contact address. Looks like its neighbours
+   but is not a link, so it gets no hover and no
+   pointer -- either would promise a click that
+   does nothing. */
+.footer-email {
+    font-size: 14px;
+
+    color: var(--bar-ink-quiet);
+
+    cursor: text;
+    user-select: text;
+}
+
 
 /* BOTTOM BAR */
 
