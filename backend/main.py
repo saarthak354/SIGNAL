@@ -10,7 +10,7 @@ import summarize
 
 from ingest import get_articles, select, paginate, cache_state
 from sources import companies
-from submissions import validate, save
+from submissions import validate, save, SubmissionNotSaved
 from homepage import score_breakdown
 
 
@@ -244,7 +244,17 @@ def submit():
 
         return jsonify({"error": error}), 400
 
-    save(entry)
+    try:
+        save(entry)
+
+    except SubmissionNotSaved:
+
+        # Never "ok" for something that was not
+        # kept. 503 because the fault is ours and
+        # retrying is the right response to it.
+        return jsonify({
+            "error": "We could not save that just now. Please try again."
+        }), 503
 
     return jsonify({"ok": True})
 

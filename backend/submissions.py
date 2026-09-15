@@ -13,14 +13,21 @@ import db
 #
 # Into the database, as rows.
 #
-# The file underneath is what they used to be:
-# one JSON object per line, append only. It is
-# kept as the place a submission lands when the
-# database cannot take it, because somebody took
-# the trouble to write to us and a failed insert
-# is not a good enough reason to lose it. Run
-# migrate_submissions.py to move anything that
-# collected there into the table.
+# The file underneath is only for a backend with
+# no database behind it -- running on a laptop
+# without Supabase. There it is the store.
+#
+# It used to double as a fallback when a database
+# insert failed, which was the wrong call once the
+# API moved to a host. Render's disk is wiped on
+# every deploy, restart and sleep, so a submission
+# written there was as good as lost -- while the
+# person who sent it was told it had arrived.
+#
+# Now a failed insert fails out loud. The form
+# says so and keeps what they typed, so trying
+# again costs them one click, and nothing is
+# promised that was not kept.
 
 DATA_DIR = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
@@ -82,24 +89,33 @@ def validate(payload):
 # STORE
 # -----------------------------------
 
+class SubmissionNotSaved(RuntimeError):
+    pass
+
+
 def save(entry):
 
-    if db.configured():
+    # No database at all: the file is the store
+    if not db.configured():
+        return append(entry)
 
-        try:
-            return db.save_submission(entry)
+    try:
+        return db.save_submission(entry)
 
-        except Exception as error:
+    except Exception as error:
 
-            print(
-                f"Submission could not be stored, "
-                f"falling back to the file: "
-                f"{type(error).__name__}: {error}"
-            )
+        # The type and the reason, not the message
+        # or the name. Nothing is lost by leaving
+        # them out -- the form keeps them for the
+        # retry -- and logs are the wrong place for
+        # what people write to us.
+        print(
+            f"SUBMISSION NOT SAVED ({entry.get('type')}): "
+            f"{type(error).__name__}: {error}",
+            flush=True
+        )
 
-    append(entry)
-
-    return entry
+        raise SubmissionNotSaved(str(error)) from error
 
 
 def append(entry):
